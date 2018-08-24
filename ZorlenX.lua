@@ -1,110 +1,122 @@
-    
 
+
+function ZorlenX_OnEvent(event)
+	if(event == "CHAT_MSG_ADDON" and arg4 ~= GetUnitName("player")) then
+		-- routing everything through the LPM announce function
+		ZorlenX_MessageReceiver(arg1, arg2, arg4);
+		LazyPigMultibox_Annouce(arg1, arg2, arg4);
+	end
+	sheepSafe:OnEvent()
+end
+	
+-- for anouncements still use LazyPigMultibox_Annouce(mode, message, sender)
+function ZorlenX_MessageReceiver(mode, message, sender)
+	local sender_name = sender or "Player"
+	if mode == "zorlenx_request_trade" then
+		ZorlenX_RequestSmartTrade(message,sender_name);
+	end 
+end
+
+function ZorlenX_PlayerIsLeader()
+  local leader = LazyPigMultibox_ReturnLeaderUnit()
+  return (leader and UnitIsUnit("player", leader))
+end
+
+function ZorlenX_PlayerInGrouped()
+  return (GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0)
+end
+
+function isSoftTarget(unit)
+  if isMage(unit) or isWarlock(unit) or isPriest(unit) or isHunter(unit) or isRogue(unit) then
+    return true
+  end
+  if isDruid(unit) and not isBearForm(unit) then
+    return true
+  end
+  return false
+end
+
+-- /script ZorlenX_UseClassScript()
 function ZorlenX_UseClassScript()
-	local time = GetTime()
-	if LPM_TIMER.SCRIPT_USE < time then	
-		LPM_TIMER.SCRIPT_USE = time + 0.25
-		
-		local rez = LPMULTIBOX.SCRIPT_REZ
-		local dps = LPMULTIBOX.SCRIPT_DPS
-		local dps_pet = LPMULTIBOX.SCRIPT_DPSPET
-		local buff = LPMULTIBOX.SCRIPT_BUFF
-		local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
-		local leader = LazyPigMultibox_ReturnLeaderUnit()
-		local check1 = LazyPigMultibox_SlaveCheck()
-		local check2 = leader and UnitIsUnit("player", leader)
-		local check3 = GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0
-		
-		if not LPMULTIBOX.STATUS then
-			return
-		end
-    
-    
-    if not Zorlen_isChanneling() and not Zorlen_isCasting() then
-      --ClearTarget()
-      -- result = Dcr_Clean(false,false)
-      --Zorlen_debug("The result of Dcr_Clean is: "..tostring(result))
-      
+  local time = GetTime()
+  if LPM_TIMER.SCRIPT_USE < time then	
+    LPM_TIMER.SCRIPT_USE = time + 0.5
+    local rez = LPMULTIBOX.SCRIPT_REZ
+    local dps = LPMULTIBOX.SCRIPT_DPS
+    local dps_pet = LPMULTIBOX.SCRIPT_DPSPET
+    local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
+    local playerIsSlave = not ZorlenX_PlayerIsLeader() and LazyPigMultibox_SlaveCheck()
+    if not LPMULTIBOX.STATUS then
+      return
+    end
+    ZorlenX_Debug(LPMULTIBOX)
+    if playerIsSlave and not Zorlen_isChanneling() and not Zorlen_isCasting() then
       -- added support for Decursive, just running the script when not Channeling or casting
       if Dcr_Clean(false,false) then
         return
       end
+      -- performing combat scan
+      local COMBAT = ZorlenX_CombatScan()
       -- added support for SheepSafe, just running the script when not Channeling or casting
-      if SheepSafeUntargeted() then 
+      if COMBAT_SCANNER.ccAbleTargetExists and COMBAT_SCANNER.activeLooseEnemyCount > 1 and SheepSafeUntargeted() then 
         return 
       end
+      -- LazyPigMultibox_AssistMaster() ingen targeting foregår før class scripts
+      if dps or dps_pet or heal or rez then
+        local class = UnitClass("player")
+        dps = dps and Zorlen_isEnemy("target") and ( ZorlenX_PlayerInGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
+        rez = rez and not UnitAffectingCombat("player")
+
+        if isPaladin() then
+          ZorlenX_Paladin(dps, dps_pet, heal, rez);
+          
+        elseif isShaman() then
+          ZorlenX_Shaman(dps, dps_pet, heal, rez);
+          
+        elseif isDruid() then
+          ZorlenX_Druid(dps, dps_pet, heal, rez);	
+          
+        elseif isPriest() then
+          ZorlenX_Priest(dps, dps_pet, heal, rez);
+          
+        elseif isWarlock() then
+          ZorlenX_Warlock(dps, dps_pet, heal, rez);
+          
+        elseif isMage() then
+          ZorlenX_Mage(dps, dps_pet, heal, rez);
+          
+        elseif isHunter() then
+          ZorlenX_Hunter(dps, dps_pet, heal, rez);
+          
+        elseif isRogue() then
+          ZorlenX_Rogue(dps, dps_pet, heal, rez);
+          
+        elseif isWarrior() then
+          ZorlenX_Warrior(dps, dps_pet, heal, rez);
+          
+        end
+        return true
+      end	
     end
-		
 
-    if not check2 and check1 then
-			--Wenlock: Changed to using LazyPigMultibox_SmartEnemyTarget
-			--LazyPigMultibox_AssistMaster();
-			--Zorlen_debug("Using smart enemy target instead!") bad idea... reverting.
-      if not UnitAffectingCombat("player") then
-        LazyPigMultibox_AssistMaster()
-      else
-        LazyPigMultibox_AssistMaster()
-        --LazyPigMultibox_TargetNearestEnemy(true, false)
+    -- spesific function for when casting evaluating target etc.
+    -- We will not change target unless player is idle
+    if playerIsSlave and Zorlen_isCasting() and UnitExists("target") and Zorlen_isEnemy("target") then
+      if ZorlenX_IsCrowdControlled() or UnitIsDeadOrGhost("target") then
+        SpellStopCasting();
       end
-      --LazyPigMultibox_FollowMaster()
-		end	
-		
-		if LPMULTIBOX.FA_DISMOUNT and LazyPigMultibox_Dismount() then
-			return 
-		end
-		
-		if LazyPigMultibox_Schedule() or LazyPigMultibox_ScheduleSpell() then
-			return
-		end
-		
-		if UnitExists("target") and (not Zorlen_isEnemy("target") or UnitIsDeadOrGhost("target"))  then
-				-- Wenlock: what whats this supposed to be?
-		end
-    
-		if sheepSafe:IsCrowdControlled() then
-		  ClearTarget();
-		end
-    
-		if dps or dps_pet or heal or rez or buff then
-			
-			local class = UnitClass("player")
+    end
 
-			dps = dps and Zorlen_isEnemy("target") and (check2 or check3 or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY or not UnitIsPlayer("target") and LPMULTIBOX.AM_ACTIVENPCENEMY))
-			rez = rez and not UnitAffectingCombat("player")
-			buff = buff and not UnitAffectingCombat("player") and not Zorlen_isEnemy("target")
-			
-			if dps and check2 and LazyPigMultibox_CheckDelayMode(true) then
-				LazyPigMultibox_Annouce("lpm_masterattack", "")
-			elseif LPM_TIMER.MASTERATTACK ~= 0 and LPM_TIMER.MASTERATTACK < time and not LPMULTIBOX.AM_ENEMY then
-				dps = nil
-			end
-		
-			LPM_DEBUG("LazyPigMultibox_UseClassScript")
-			if class == "Paladin" then
-				ZorlenX_Paladin(dps, dps_pet, heal, rez, buff);
-			elseif class == "Shaman" then
-				ZorlenX_Shaman(dps, dps_pet, heal, rez, buff);
-			elseif class == "Druid" then
-				ZorlenX_Druid(dps, dps_pet, heal, rez, buff);		
-			elseif class == "Priest" then
-				ZorlenX_Priest(dps, dps_pet, heal, rez, buff);
-			elseif class == "Warlock" then
-				ZorlenX_Warlock(dps, dps_pet, heal, rez, buff);
-			elseif class == "Mage" then
-				ZorlenX_Mage(dps, dps_pet, heal, rez, buff);
-			elseif class == "Hunter" then
-				ZorlenX_Hunter(dps, dps_pet, heal, rez, buff);
-			elseif class == "Paladin" then
-				ZorlenX_Paladin(dps, dps_pet, heal, rez, buff);
-			elseif class == "Rogue" then
-				ZorlenX_Rogue(dps, dps_pet, heal, rez, buff);
-			elseif class == "Warrior" then
-				ZorlenX_Warrior(dps, dps_pet, heal, rez, buff);
-			end
-			return true
-		end	
-		return nil
-	end	
+    if LPMULTIBOX.FA_DISMOUNT and LazyPigMultibox_Dismount() then
+      return 
+    end
+
+    if LazyPigMultibox_Schedule() or LazyPigMultibox_ScheduleSpell() then
+      return
+    end
+
+    return nil
+  end	
 end
 
 function FollowLeader()
@@ -118,158 +130,41 @@ function isGrouped()
   return GetNumPartyMembers() > 0 or UnitInRaid("player")
 end
 
-local serve_time
-
-function ZorlenX_RequestSmartTrade(message,sender_name)
-  local time = GetTime()
-  if not serve_time then
-    serve_time = time - 1
-  end
-  if serve_time < time then
-    serve_time = time + 1
-  else 
-    return false
-  end
-  if TradeFrame:IsVisible() then
-    return AcceptTrade()
-  end
 
 
-  if message == "WATER" and Nok_ServeDrinks(sender_name) then
-    return true
-  elseif message == "HEALTHSTONE" and Nok_ServeHealthstone(sender_name) then
-    player_is_serving = true
-    return true
-  elseif message == "POTIONS" and Nok_ServePortions(sender_name) then
-    player_is_serving = true
-    return true
-  end
-end
-
-function ZorlenX_PickupContainerItemByName(item_name)
-  local ParentID, ItemID = Zorlen_GiveContainerItemSlotNumberByName(item_name)
-  PickupContainerItem(ParentID, ItemID)
-end
-
-function ZorlenX_DropItemOnPlayerByName(player_name)
-  local sender_unit = LazyPigMultibox_ReturnUnit(player_name)
-  DropItemOnUnit(sender_unit)
-end
-
-
-function ZorlenX_MageWaterName()
-  if Zorlen_IsSpellKnown("Conjure Water", 7) then
-    return "Conjured Crystal Water"
-  elseif Zorlen_IsSpellKnown("Conjure Water", 6) then
-    return "Conjured Sparkling Water"
-  elseif Zorlen_IsSpellKnown("Conjure Water", 5) then 
-    return "Conjured Mineral Water"
-  elseif Zorlen_IsSpellKnown("Conjure Water", 4) then 
-    return "Conjured Spring Water"
-  elseif Zorlen_IsSpellKnown("Conjure Water", 3) then
-    return "Conjured Purified Water"
-  elseif Zorlen_IsSpellKnown("Conjure Water", 2) then
-    return "Conjured Fresh Water"
-  elseif Zorlen_IsSpellKnown("Conjure Water", 1) then
-    return "Conjured Water"
-  end
-end
-
-function ZorlenX_MageWaterCount()
-  local water_name = ZorlenX_MageWaterName()
-  return Zorlen_GiveContainerItemCountByName(water_name)
-end
-
-function ZorlenX_OrderDrinks()
-  if usesMana(player) and not isMage("player") and not Zorlen_isMoving() and isGrouped() and Zorlen_notInCombat() then
-    Zorlen_UpdateDrinkItemInfo()
-    local bag, slot, fullcount, level = Zorlen_GetDrinkSlotNumber()
-    if not fullcount then
-      fullcount = 0
-    end
-    if fullcount < 5 then
-      Zorlen_debug("Request water, only "..fullcount.." drinks left.")
-      return LazyPigMultibox_Annouce("lpm_request_trade", "WATER")
-    end
-  end
-  return false
-end
-
-function ZorlenX_ServeDrinks(player_name)
-  if isMage("player") and ZorlenX_MageWaterCount() > 15 then
-    local water_name = ZorlenX_MageWaterName()
-    ZorlenX_PickupContainerItemByName(water_name)
-    ZorlenX_DropItemOnPlayerByName(player_name)
-    return true
-  end
-  return false
-end
-
-function ZorlenX_ServeHealthstone(player_name)
-  --if isWarlock("player") and Nok_MageWaterCount() > 15 then
-  --  local water_name = Nok_MageWaterName()
-  --  Nok_PickupContainerItemByName(water_name)
-  --  Nok_DropItemOnPlayerByName(player_name)
-  --  return true
-  --end
-  return false
-end
-
-function ZorlenX_ServePortions(player_name)
-  return false
-end
-
-function ZorlenX_MageConjure()
-		if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
-			return false
-		end
-    if Zorlen_ManaPercent("player") < 10 then
-      return false
-    end
-    if isMage("player") and Nok_MageWaterCount() < 60 and Zorlen_castSpellByName("Conjure Water") then 
-      return true
-    end
-    if Zorlen_IsSpellKnown("Conjure Mana Jade") and not manaJadeExists() and Zorlen_castSpellByName("Conjure Mana Jade") then 
-      return true 
-    end
-    if Zorlen_IsSpellKnown("Conjure Mana Agate") and not manaAgateExists() and Zorlen_castSpellByName("Conjure Mana Agate") then 
-      return true
-    end
-    return false
-end
 
 function ZorlenX_OutOfCombat()
-    if isDrinkingActive() and Zorlen_ManaPercent("player") > 95  then
-      SitOrStand()
-    end
-    
-    if ZorlenX_OrderDrinks() then
-      return
-    end
-    
-    if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
-			return
-		end
+  if isDrinkingActive() and Zorlen_ManaPercent("player") > 95  then
+    SitOrStand()
+  end
 
-    if not Zorlen_isMoving() and LazyPigMultibox_Rez() then
-      return 
-    end
-    
-    if not Zorlen_isMoving() and isWarlock("player") and LazyPigMultibox_SmartSS() then
-      return
-    end
-    
-    if not Zorlen_isMoving() and isMage("player") and ZorlenX_MageConjure() then
-      return
-    end
+  if ZorlenX_OrderDrinks() then
+    return
+  end
 
-    if LazyPigMultibox_UnitBuff() then
-      return
-    end
-    
-    if Zorlen_Drink() then
-      return
-    end
+  if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
+    return
+  end
+
+  if not Zorlen_isMoving() and LazyPigMultibox_Rez() then
+    return 
+  end
+
+  if not Zorlen_isMoving() and isWarlock("player") and LazyPigMultibox_SmartSS() then
+    return
+  end
+
+  if not Zorlen_isMoving() and isMage("player") and ZorlenX_MageConjure() then
+    return
+  end
+
+  if LPMULTIBOX.SCRIPT_BUFF and LazyPigMultibox_UnitBuff() then
+    return
+  end
+
+  if Zorlen_Drink() then
+    return
+  end
 end
 
 function ZorlenX_UnitIsTank(unit)
@@ -285,32 +180,116 @@ function ZorlenX_GetTargetCurHP()
 end
 
 function ZorlenX_IsTotem(unit)
-    if not UnitExists(unit) then
-      return false
-    end
-    local targetName = UnitName(unit)
-  	local t = {
-      [LOCALIZATION_ZORLEN.GreaterHealingWard] = true,
-      [LOCALIZATION_ZORLEN.LavaSpoutTotem] = true,
-      [LOCALIZATION_ZORLEN.TremorTotem] = true,
-      [LOCALIZATION_ZORLEN.EarthbindTotem] = true,
-      [LOCALIZATION_ZORLEN.HealingStreamTotem] = true,
-      [LOCALIZATION_ZORLEN.ManaTideTotem] = true,
-      [LOCALIZATION_ZORLEN.ManaSpringTotem] = true,
-      [LOCALIZATION_ZORLEN.SearingTotem] = true,
-      [LOCALIZATION_ZORLEN.MagmaTotem] = true,
-      [LOCALIZATION_ZORLEN.FireNovaTotem] = true,
-      [LOCALIZATION_ZORLEN.GroundingTotem] = true,
-      [LOCALIZATION_ZORLEN.WindfuryTotem] = true,
-      [LOCALIZATION_ZORLEN.FlametongueTotem] = true,
-      [LOCALIZATION_ZORLEN.StrengthOfEarthTotem] = true,
-      [LOCALIZATION_ZORLEN.GraceOfAirTotem] = true,
-      [LOCALIZATION_ZORLEN.StoneskinTotem] = true,
-      [LOCALIZATION_ZORLEN.WindwallTotem] = true,
-      [LOCALIZATION_ZORLEN.FireResistanceTotem] = true,
-      [LOCALIZATION_ZORLEN.FrostResistanceTotem] = true,
-      [LOCALIZATION_ZORLEN.NatureResistanceTotem] = true,
-      [LOCALIZATION_ZORLEN.PoisonCleansingTotem] = true
-	}
+  if not UnitExists(unit) then
+    return false
+  end
+  local targetName = UnitName(unit)
+  local t = {
+    [LOCALIZATION_ZORLEN.GreaterHealingWard] = true,
+    [LOCALIZATION_ZORLEN.LavaSpoutTotem] = true,
+    [LOCALIZATION_ZORLEN.TremorTotem] = true,
+    [LOCALIZATION_ZORLEN.EarthbindTotem] = true,
+    [LOCALIZATION_ZORLEN.HealingStreamTotem] = true,
+    [LOCALIZATION_ZORLEN.ManaTideTotem] = true,
+    [LOCALIZATION_ZORLEN.ManaSpringTotem] = true,
+    [LOCALIZATION_ZORLEN.SearingTotem] = true,
+    [LOCALIZATION_ZORLEN.MagmaTotem] = true,
+    [LOCALIZATION_ZORLEN.FireNovaTotem] = true,
+    [LOCALIZATION_ZORLEN.GroundingTotem] = true,
+    [LOCALIZATION_ZORLEN.WindfuryTotem] = true,
+    [LOCALIZATION_ZORLEN.FlametongueTotem] = true,
+    [LOCALIZATION_ZORLEN.StrengthOfEarthTotem] = true,
+    [LOCALIZATION_ZORLEN.GraceOfAirTotem] = true,
+    [LOCALIZATION_ZORLEN.StoneskinTotem] = true,
+    [LOCALIZATION_ZORLEN.WindwallTotem] = true,
+    [LOCALIZATION_ZORLEN.FireResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.FrostResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.NatureResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.PoisonCleansingTotem] = true
+  }
   return t[targetName]
+end
+
+
+function ZorlenX_tableLength(T)
+  local count = 0
+  for _ in pairs(T) do 
+    count = count + 1 
+  end
+  return count
+end
+
+function ZorlenX_tableKeys(T)
+  local count = 0
+  local keyset={}
+  for k,v in pairs(T) do 
+    count = count + 1 
+    keyset[count]=k
+  end
+  return keyset
+end
+
+-- To solve the very strange behaviour on Elysium 
+function ZorlenX_mobIsBoss(unit)
+  local bosses = {}
+  local unitName = UnitName(unit)
+  bosses["Scarlet Commander Mograine"] = true
+  bosses["High Inquisitor Whitemane"] = true
+  bosses["Nekrum Gutchewer"] = true
+  bosses["Shadowpriest Sezz'ziz"] = true
+  bosses["Chief Ukorz Sandscalp"] = true
+  bosses["Ruuzlu"] = true
+  if UnitClassification("target") == "worldboss" or bosses[unitName] then
+    return true
+  end
+  return false
+end
+
+
+
+
+
+
+----------------- utilities -------
+function ZorlenX_Debug(value)
+  DEFAULT_CHAT_FRAME:AddMessage("---")
+  DEFAULT_CHAT_FRAME:AddMessage(to_string(value))
+end
+
+function table_print (tt, indent, done)
+  done = done or {}
+  indent = indent or 0
+  if type(tt) == "table" then
+    local sb = {}
+    for key, value in pairs (tt) do
+      table.insert(sb, string.rep (" ", indent)) -- indent it
+      if type (value) == "table" and not done [value] then
+        done [value] = true
+        table.insert(sb, key .. " = {\n");
+        table.insert(sb, table_print (value, indent + 2, done))
+        table.insert(sb, string.rep (" ", indent)) -- indent it
+        table.insert(sb, "}\n");
+      elseif "number" == type(key) then
+        table.insert(sb, string.format("\"%s\"\n", tostring(value)))
+      else
+        table.insert(sb, string.format(
+            "%s = \"%s\"\n", tostring (key), tostring(value)))
+      end
+    end
+    return table.concat(sb)
+  else
+    return tt .. "\n"
+  end
+end
+
+function to_string( tbl )
+  if  "nil"       == type( tbl ) then
+    return tostring(nil)
+  elseif  "table" == type( tbl ) then
+    return table_print(tbl)
+  elseif  "string" == type( tbl ) then
+    return tbl
+  else
+    return tostring(tbl)
+  end
 end

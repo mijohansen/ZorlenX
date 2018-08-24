@@ -1,3 +1,4 @@
+-- at this point lacks target.
 function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
 	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
 	
@@ -5,34 +6,26 @@ function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
 		return true
 	end
   
-  if Nok_MageRestoreMana() then
+  if ZorlenX_MageRestoreMana() then
     return true
   end
+  
   -- added evocation on low mana.
-  if  Wenlock_MageOnLowManaEvocation() then
+  if ZorlenX_MageOnLowManaEvocation() then
     return true
   end
   
-	if buff then
-		LazyPigMultibox_UnitBuff();
-	end
-  
-  if Wenlock_MageDPS() then
+  if ZorlenX_MageDPS() then
     return true
 	end
 end
 
-function LazypigMultibox_MageDPS(dps,locked)
-  if dps and not locked then		
-    if Zorlen_IsSpellKnown("Frostbolt") then
-      castFrostbolt();
-    else	
-      castFireball();
-    end	
-  end	
+-- target mob that aggroes cloth with a frost bolt.
+function ZorlenX_MageDefensiveMove()
+
 end
 
-function Wenlock_MageOnLowManaEvocation()
+function ZorlenX_MageOnLowManaEvocation()
   if not Zorlen_IsSpellKnown("Evocation") or Zorlen_isMoving() or not Zorlen_inCombat() then
     return false
   end
@@ -42,12 +35,12 @@ function Wenlock_MageOnLowManaEvocation()
   return false
 end
 
-function Wenlock_MageSmartScorch()
+function ZorlenX_MageSmartScorch()
   if Zorlen_isDieingEnemy() or not Zorlen_IsSpellKnown("Scorch") then
     return false
   end
   local scorch_stack = Zorlen_GetDebuffStack("Spell_Fire_SoulBurn", "target")
-  local target_hp = Nok_GetTargetCurHP()
+  local target_hp = ZorlenX_GetTargetCurHP()
   local player_hp = UnitHealthMax("player")
   --Zorlen_debug("scorch_stack: " .. scorch_stack .. ", target_hp: " .. target_hp .. ", player_hp: " .. player_hp);
   if target_hp > 2*player_hp and scorch_stack < 5 and cast_ManaEfficient_Scorch() then
@@ -56,11 +49,11 @@ function Wenlock_MageSmartScorch()
   return false
 end
 
-function Nok_MageCombustion()
+function ZorlenX_MageCombustion()
   if Zorlen_isDieingEnemy() or not Zorlen_IsSpellKnown("Combustion") and not Zorlen_checkCooldownByName("Combustion") then
     return false
   end
-  local target_hp = Nok_GetTargetCurHP()
+  local target_hp = ZorlenX_GetTargetCurHP()
   local player_hp = UnitHealthMax("player")
   if target_hp > 2*player_hp and Zorlen_ManaPercent("player") > 33 and Zorlen_castSpellByName("Combustion") then
     return true
@@ -68,11 +61,11 @@ function Nok_MageCombustion()
   return false
 end
 
-function Wenlock_MageDPS()
-  if Wenlock_MageSmartScorch() then
+function ZorlenX_MageDPS()
+  if ZorlenX_MageSmartScorch() then
     return true
   end
-  if Nok_MageCombustion() then
+  if ZorlenX_MageCombustion() then
     return true
   end
   if castFireBlast()  then
@@ -88,7 +81,7 @@ function Wenlock_MageDPS()
   return false
 end
 
-function Wenlock_MageConjure()
+function ZorlenX_MageConjure()
 		if UnitAffectingCombat("player") then
 			return
 		end
@@ -116,7 +109,7 @@ end
 
 
 
-function Nok_MageRestoreMana()
+function ZorlenX_MageRestoreMana()
   if Zorlen_ManaPercent("player") > 50 then
     return false
   end
@@ -128,4 +121,46 @@ function Nok_MageRestoreMana()
   end
   return false
 end
-  
+
+function ZorlenX_MageWaterName()
+  if Zorlen_IsSpellKnown("Conjure Water", 7) then
+    return "Conjured Crystal Water"
+  elseif Zorlen_IsSpellKnown("Conjure Water", 6) then
+    return "Conjured Sparkling Water"
+  elseif Zorlen_IsSpellKnown("Conjure Water", 5) then 
+    return "Conjured Mineral Water"
+  elseif Zorlen_IsSpellKnown("Conjure Water", 4) then 
+    return "Conjured Spring Water"
+  elseif Zorlen_IsSpellKnown("Conjure Water", 3) then
+    return "Conjured Purified Water"
+  elseif Zorlen_IsSpellKnown("Conjure Water", 2) then
+    return "Conjured Fresh Water"
+  elseif Zorlen_IsSpellKnown("Conjure Water", 1) then
+    return "Conjured Water"
+  end
+end
+
+function ZorlenX_MageWaterCount()
+  local water_name = ZorlenX_MageWaterName()
+  return Zorlen_GiveContainerItemCountByName(water_name)
+end
+
+
+function ZorlenX_MageConjure()
+  if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
+    return false
+  end
+  if Zorlen_ManaPercent("player") < 10 then
+    return false
+  end
+  if isMage("player") and ZorlenX_MageWaterCount() < 60 and Zorlen_castSpellByName("Conjure Water") then 
+    return true
+  end
+  if Zorlen_IsSpellKnown("Conjure Mana Jade") and not manaJadeExists() and Zorlen_castSpellByName("Conjure Mana Jade") then 
+    return true 
+  end
+  if Zorlen_IsSpellKnown("Conjure Mana Agate") and not manaAgateExists() and Zorlen_castSpellByName("Conjure Mana Agate") then 
+    return true
+  end
+  return false
+end

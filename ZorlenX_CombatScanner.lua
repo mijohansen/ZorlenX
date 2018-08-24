@@ -1,114 +1,170 @@
 COMBAT_SCANNER = {}
-COMBAT_SCANNER.activeLooseEnemyCount = 0
-COMBAT_SCANNER.myCCApplied = false
-COMBAT_SCANNER.highestHealth = 999999
-COMBAT_SCANNER.lowestHealth = 0
-COMBAT_SCANNER.isBossFight = false
-COMBAT_SCANNER.totemExists = false
-COMBAT_SCANNER.targetAttackingMe = false
-COMBAT_SCANNER.targetAttackingCloth = false
-COMBAT_SCANNER.ccApplied = {}
 
 function ZorlenX_ccIsApplied(cc_spellname)
-	SheepSafe_ccIsApplied(cc_spellname)
-
+  return COMBAT_SCANNER.ccsApplied[cc_spellname]
 end
+
+-- /script local cs = ZorlenX_CombatScan() ZorlenX_Debug(cs)
 -- UntargetedTarget
 function ZorlenX_CombatScan()
-  if self == nil then
-   	self = sheepSafe
+  if COMBAT_SCANNER.lastScanTime and (COMBAT_SCANNER.lastScanTime + 1) > GetTime() then
+    return COMBAT_SCANNER
   end
-  local last_scan_time = GetTime()
-  local my_cc_is_applied = false
+  if self == nil then
+    self = sheepSafe
+  end
+  -- resetting values
+  COMBAT_SCANNER.lastScanDuration = 0
+  COMBAT_SCANNER.lastScanCount = 0
+  COMBAT_SCANNER.lastScanTime = GetTime()
+  COMBAT_SCANNER.activeLooseEnemyCount = 0
+  COMBAT_SCANNER.myCCApplied = false
+  COMBAT_SCANNER.highestHealth = nil
+  COMBAT_SCANNER.lowestHealth = nil
+  COMBAT_SCANNER.isBossFight = false
+  COMBAT_SCANNER.totemExists = false
+  COMBAT_SCANNER.targetAttackingMe = false
+  COMBAT_SCANNER.targetAttackingCloth = false
+  COMBAT_SCANNER.ccAbleTargetExists = false
+  COMBAT_SCANNER.ccsApplied = {}
+
+  --defining some locals
   local activeLooseEnemies = {}
   local enemiesTargetingYou = {}
-  local highest_health = 0
-  local lowest_health = 999999
-  local is_boss_fight = false
-  local activeLooseEnemyCount = 0
+  local castersWithAggro = {}
+  local enemyesAggroingCasters= {}
 
-  
-  COMBAT_SCANNER.last_scan_time = last_scan_time
-  COMBAT_SCANNER.totemExists = false
-  COMBAT_SCANNER.isBossFight = false
-  
+
+  for cc_spellname,applied in pairs(sheepSafe.ccs) do
+    COMBAT_SCANNER.ccsApplied[cc_spellname] = false
+  end
+
   for i = 1, 10 do
     TargetNearestEnemy()
     if not UnitExists("target") then
       break
     end
-    local current_target_health = MobHealth_GetTargetCurHP()
+    -- determines the CCed targets we have..
+    local targetIsCrowdControlled = false
+    for cc_spellname,applied in pairs(sheepSafe.ccs) do
+      if Zorlen_checkDebuff(cc_spellname,"target") then
+        COMBAT_SCANNER.ccsApplied[cc_spellname] = true
+        targetIsCrowdControlled	=	true
+      end
+    end
+    if ZorlenX_IsTotem("target") then
+      COMBAT_SCANNER.totemExists = true
+    end
+
     local current_target_name = UnitName("target").." - "..UnitLevel("target")
-	local targetIsCrowdControlled = false
-	for cc_spellname,applied in pairs(sheepSafe.ccs) do
-		COMBAT_SCANNER.ccApplied[cc_spellname] = Zorlen_checkDebuff(cc_spellname,"target")
-		if COMBAT_SCANNER.ccApplied[cc_spellname then
-			targetIsCrowdControlled=true
-		end
-	end
+    if Zorlen_isEnemyTargetingYou() then
+      enemiesTargetingYou[current_target_name] = 1
+    end
 
     if Zorlen_isActiveEnemy("target") and not targetIsCrowdControlled then
       activeLooseEnemies[current_target_name] = 1
+      if ZorlenX_isUnitCCable("target") then
+        COMBAT_SCANNER.ccAbleTargetExists = true
+      end
     end
-	
-	if Zorlen_isEnemyTargetingYou() then
-		enemiesTargetingYou[current_target_name] = 1
-	end
 
-	if ZorlenX_mobIsBoss("target") then
-	  COMBAT_SCANNER.isBossFight = true
-	end
-	
-	if current_target_health and current_target_health > highest_health then
-	  highest_health = current_target_health
-	end
-	if current_target_health and current_target_health < lowest_health then
-	  lowest_health = current_target_health
-	end
-	
-	if ZorlenX_IsTotem("target") then
-	  COMBAT_SCANNER.totemExists = true
-	end
+    if Zorlen_isActiveEnemy("target") and UnitExists("targettarget") and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
+      enemyesAggroingCasters[current_target_name] = true
+      castersWithAggro[UnitName("targettarget")] = true
+    end
+
+    if Zorlen_isActiveEnemy("target") and ZorlenX_mobIsBoss("target") then
+      COMBAT_SCANNER.isBossFight = true
+    end
+
+    -- health targeting
+    local TargetHealth = UnitHealth("target")
+    if Zorlen_isActiveEnemy("target") and not targetIsCrowdControlled and TargetHealth then
+      if not COMBAT_SCANNER.highestHealth or TargetHealth > COMBAT_SCANNER.highestHealth then
+        COMBAT_SCANNER.highestHealth = TargetHealth
+      end
+      if not COMBAT_SCANNER.lowestHealth or TargetHealth < COMBAT_SCANNER.lowestHealth then
+        COMBAT_SCANNER.lowestHealth = TargetHealth
+      end
+    end
   end
-  
-  -- counting active loose enemies
-  for k,v in pairs(activeLooseEnemies) do
-    activeLooseEnemyCount = activeLooseEnemyCount + 1
-  end
-  COMBAT_SCANNER.activeLooseEnemyCount = activeLooseEnemyCount
-  COMBAT_SCANNER.highestHealth = highest_health
-  COMBAT_SCANNER.lowestHealth = lowest_health
-  COMBAT_SCANNER.isBossFight = is_boss_fight
-  
-  -- just getting back to the previous playertarget
-  TargetUnit("playertarget")
-  return my_cc_is_applied, activeLooseEnemyCount
+
+  -- counting active loose enemies++
+  COMBAT_SCANNER.activeLooseEnemyCount = ZorlenX_tableLength(activeLooseEnemies)
+  COMBAT_SCANNER.enemiesTargetingYouCount = ZorlenX_tableLength(enemiesTargetingYou)
+  COMBAT_SCANNER.castersWithAggro = ZorlenX_tableKeys(castersWithAggro)
+  COMBAT_SCANNER.castersWithAggroCount = ZorlenX_tableLength(castersWithAggro)
+  COMBAT_SCANNER.lastScanDuration = GetTime() - COMBAT_SCANNER.lastScanTime
+
+  return COMBAT_SCANNER
 end
 
-function targetSheepable()
-end
+
 
 function targetLowestHP()
-end
-
-function targetShacklable()
+  if not COMBAT_SCANNER.lowestHealth then
+    return false
+  end
+  for i = 1, 6 do
+    TargetNearestEnemy()
+    local TargetHealth = UnitHealth("target")
+    if Zorlen_isActiveEnemy("target") and (COMBAT_SCANNER.lowestHealth + 10) > TargetHealth then
+      return true
+    end
+  end
 end
 
 function targetHighestHP()
+  if not COMBAT_SCANNER.highestHealth then
+    return false
+  end
+  if Zorlen_isActiveEnemy("target") and (COMBAT_SCANNER.highestHealth - 10) < TargetHealth and not ZorlenX_IsCrowdControlled() then
+    return true
+  end
 end
 
-function targetAttackingMe()
+function targetEnemyAttackingMe()
+  if not COMBAT_SCANNER.enemiesTargetingYouCount > 0 then
+    return false
+  end
+  for i = 1, 6 do
+    TargetNearestEnemy()
+    if Zorlen_isEnemyTargetingYou() then
+      return true
+    end
+  end
 end
 
-function targetAttackingMe()
+function targetEnemyAggroingCasters()
+  if not COMBAT_SCANNER.castersWithAggroCount > 0 then
+    return false
+  end
+  for i = 1, 6 do
+    TargetNearestEnemy()
+    if Zorlen_isActiveEnemy() and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
+      return true
+    end
+  end
 end
 
-function sheepSafe:FindUntargetedTarget()
+function targetBoss()
+  if not COMBAT_SCANNER.isBossFight then
+    return false
+  end
+  for i = 1, 6 do
+    TargetNearestEnemy()
+    if Zorlen_isActiveEnemy() and ZorlenX_mobIsBoss("target") then
+      return true
+    end
+  end
+end
+
+function ZorlenX_FindUntargetedTarget()
   if not sheepSafeConfig.toggle then
     return false
   end
   if self == nil then
-   	self = sheepSafe
+    self = sheepSafe
   end
   local myCCisApplied = ZorlenX_ccIsApplied(sheepSafe.ccicon)
   local activeLooseEnemyCount = COMBAT_SCANNER.activeLooseEnemyCount
@@ -118,124 +174,53 @@ function sheepSafe:FindUntargetedTarget()
     sheepSafe:p("Aborting: I have a cc already.");
     return false
   end
-  --sheepSafe:p("SheepSafe thinks it have ".. activeLooseEnemyCount .. " active loose enemies.");
+
   if activeLooseEnemyCount < 2 then
     sheepSafe:p("Aborting: Too few loose enemies.");
     return false
   end
+
+  if not COMBAT_SCANNER.ccAbleTargetExists then
+    return false
+  end
   -- main loop to find the actual target
-  for i = 1, 10 do
+  for i = 1, 6 do
     TargetNearestEnemy()
-    if (not UnitCanAttack("player", "target")) then
-      -- case where player was targeting nothing/friend, and	no enemies in vicinity
+    TargetName = UnitName("target")
+
+    if not UnitCanAttack("player", "target") or not TargetName or not Zorlen_isActiveEnemy("target") then
+      -- case where player was targeting nothing/friend, and no enemies in vicinity
       break
     end
-    
-
-    if ZorlenX_mobIsBoss("target") then
-      break
+    if ZorlenX_isUnitCCable("target") then
+      return true
     end
-    
-    eName = UnitName("target")
-    if eName and Zorlen_isActiveEnemy("target") then
-      --sheepSafe.d(":: "..sheepSafe.nonil(name))
-      --sheepSafe:p("checking target: ".. eName);
-      if not self.inCombat then
-        self.inCombat =	UnitExists("targettarget")
-        -- probably should check that the target is player/party/raid
-        -- but	this will do for now
-      end
-      
-      local clear = true
-      local wrkUnit
-      local wrkTarget
-      if checkRaidAndPartyTargets then
-        for i =	1, GetNumRaidMembers() do
-          wrkUnit	= "raid"..i
-          wrkTarget = wrkUnit.."target"
-          name = UnitName(wrkUnit)
-
-          if not UnitIsUnit("player",wrkUnit) then
-            if (name and UnitIsUnit("target", wrkTarget)) then
-              sheepSafe:p(name.." is targeting "..eName..", skipping")
-              clear =	false
-              break
-          end
-          
-          wrkUnit	= "raidpet"..i
-          wrkTarget = wrkUnit.."target"
-
-          petName	= UnitName(wrkUnit)
-          if (petName and	UnitIsUnit("target", wrkTarget)) then
-            sheepSafe:p(name.." ("..name.."'s pet) is targeting "..eName..", skipping")
-            clear =	false
-            break
-          end
-        end
-      end
-
-        for i =	1, GetNumPartyMembers()	do
-          wrkUnit	= "party"..i
-          wrkTarget = wrkUnit.."target"
-          name = UnitName(wrkUnit)
-
-          if (name and UnitIsUnit("target", wrkTarget)) then
-            sheepSafe:p(name.." is targeting "..eName..", skipping")
-            clear =	false
-            break
-          end
-
-          wrkUnit	= "partypet"..i
-          petName	= UnitName(wrkUnit)
-          wrkTarget = wrkUnit.."target"
-          
-          if (petName and	UnitIsUnit("target", wrkTarget)) then
-            sheepSafe:p(name.." ("..name.."'s pet) is targeting "..eName..", skipping")
-            clear =	false
-            break
-          end
-        end
-     
-
-        --	if clear then
-        --		clear =	(UnitReaction("target",	"player") <= 3);
-        --	end
-      end
-      if (UnitIsFriend("player","target")) then
-        sheepSafe:d(UnitName("target").." is a friend");
-      else
-        sheepSafe:d(UnitName("target").." is not a friend");
-      end
-	
-      creatureType = UnitCreatureType("target")
-      
-      if (clear and not string.find(self.validtargets, creatureType))	then
-        sheepSafe:d("Can't "..self.ccverb2.." ".. eName .." : not "..self.validtargetsdesc)
-        clear =	false
-      end
-
-      if clear then
-        clear =	UnitExists("targettarget")
-      end
-
-      if clear then
-        clear =	not sheepSafe:IsCrowdControlled()
-      end
-	
-      if clear and self.class ~= "WARLOCK" then
-        clear =	not sheepSafe:IsDotted()
-      end
-      
-      if clear and (Zorlen_HealthPercent("target") > 60) and Nok_GetTargetCurHP() > UnitHealthMax("player") then
-          sheepSafe:p(eName.." is an untargeted target.")
-          return true
-      end
-      
-    end
-   end
-   --sheepSafe:p("Sorry, no untargeted undotted hostile targets.")
-   TargetUnit("playertarget")
-   return false
+  end
 end
 
-FindUntargetedTarget = sheepSafe.FindUntargetedTarget
+function ZorlenX_isUnitCCable(unit) 
+  if self == nil then
+    self = sheepSafe
+  end
+  if ZorlenX_mobIsBoss("target") then
+    return false
+  end
+  local targetCreatureType = UnitCreatureType("target")
+  if creaturetype and not string.find(self.validtargets, targetCreatureType) then
+    return false
+  end
+
+  if ZorlenX_IsCrowdControlled() then
+    return false
+  end
+
+  if self.class ~= "WARLOCK" and sheepSafe:IsDotted() then
+    return false
+  end
+  -- ok this seem to be a good target...
+  if Zorlen_HealthPercent("target") > 60 and ZorlenX_GetTargetCurHP() > UnitHealthMax("player") then
+    sheepSafe:p(TargetName.." is an untargeted target.")
+    return true
+  end
+end 
+

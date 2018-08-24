@@ -4,6 +4,6 @@
 ## Notes: Multiboxing Tool
 ## Author: Wenlock
 ## SavedVariablesPerCharacter: ZORLENX
-## Dependencies: _LazyPig, _LazyPigMultibox, Zorlen, QuickHeal, SmartBuff
+## Dependencies: _LazyPig, _LazyPigMultibox, Zorlen, QuickHeal, SmartBuff, MobInfo2, Decursive
 
 ZorlenX.xml

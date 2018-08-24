@@ -38,7 +38,7 @@ function ZorlenX_Priest(dps, dps_pet, heal, rez, buff)
 	end	
 	
 	if dps then
-    Nok_PriestDps()
+    ZorlenX_PriestDps()
   else
     if heal and not isShootActive() then
       -- just do some extra Wanding when in healmode
@@ -47,7 +47,7 @@ function ZorlenX_Priest(dps, dps_pet, heal, rez, buff)
 	end
 end
 
-function Nok_PriestDps()
+function ZorlenX_PriestDps()
 		--local plague_stack = Zorlen_GetDebuffStack("Spell_Shadow_BlackPlague", "target")
     local plague_stack = 5
     local smite_enabled = false

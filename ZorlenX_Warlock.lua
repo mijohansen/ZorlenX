@@ -9,7 +9,7 @@ local lpm_pet = "Imp"
 local lpm_warlock_curse = "Curse of the Elements"
 local lpm_firelock = true
 
-function ZorlenX_Warlock(dps, dps_pet, heal, rez, buff)
+function ZorlenX_Warlock(dps, dps_pet, heal, rez)
 	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
 	local manapercent = UnitMana("player") / UnitManaMax("player")
 	local healthpercent = UnitHealth("player") / UnitHealthMax("player")
@@ -48,10 +48,6 @@ function ZorlenX_Warlock(dps, dps_pet, heal, rez, buff)
 		return
 	end	
 	
-	if buff then
-		LazyPigMultibox_UnitBuff();
-		--LazyPigMultibox_WarlockBuff();
-	end
 end
 
 function LazyPigMultibox_WarlockBuff()

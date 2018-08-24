@@ -1,4 +1,17 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 C:\Projects\WoW\Bin\Interface\FrameXML\UI.xsd">
 	<Script file="ZorlenX.lua"/>
+	<Script file="ZorlenX_CombatScanner.lua"/>
+	<Script file="ZorlenX_SheepSafe.lua"/>
+	<Script file="ZorlenX_Mage.lua"/>
+	<Frame name="ZorlenX_Frame">
+    <Scripts>
+      <OnLoad>
+		sheepSafe:OnLoad()
+      </OnLoad>
+      <OnEvent>
+		ZorlenX_OnEvent()
+      </OnEvent>
+    </Scripts>
+  </Frame>
 </Ui>

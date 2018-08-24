@@ -233,7 +233,7 @@ function sheepSafe:SheepSafe()
       return false
    end
 
-  if( sheepSafe:IsCrowdControlled()) then
+  if ZorlenX_IsCrowdControlled() then
     sheepSafe:p("Target is Crowd Controlled, skipping...");
     return false
   end
@@ -453,7 +453,7 @@ function sheepSafe:SheepSafeUntargeted()
   if not self.cc then
     return result
   end
-  if UnitAffectingCombat("player") and sheepSafe:FindUntargetedTarget() then 
+  if UnitAffectingCombat("player") and ZorlenX_FindUntargetedTarget() then 
     sheepSafe:SheepSafe()
     result = true
   else
@@ -493,13 +493,12 @@ function sheepSafe:trace(msg)
    end
 end
 
-function sheepSafe:IsCrowdControlled()
+function ZorlenX_IsCrowdControlled()
   if not UnitExists("target") then
     return false
   end
 	local tdb
 	local stripped
-	--sheepSafe:d("checking debuffs for "..UnitName("target"));
 	for i=1,16 do
 		tdb = UnitDebuff("target",i);
 		if tdb then
@@ -780,61 +779,3 @@ function sheepSafe:SetDefaults()
 	sheepSafe.ConfigDefaults.warning = false
 	sheepSafe.ConfigDefaults.debug	= false
 end
-
---function sheepSafe.showArgs()
---	sheepSafe:d("arg0 : "..sheepSafe:nilSafe(arg0))
---	sheepSafe:d("arg2 : "..sheepSafe:nilSafe(arg2))
---	sheepSafe:d("arg2 : "..sheepSafe:nilSafe(type(arg2)))
---	sheepSafe:d("arg3 : "..sheepSafe:nilSafe(arg3))
---	sheepSafe:d("arg3 : "..sheepSafe:nilSafe(type(arg3)))
---	sheepSafe:d("arg4 : "..sheepSafe:nilSafe(arg4))
---	sheepSafe:d("arg4 : "..sheepSafe:nilSafe(type(arg4)))
---	sheepSafe:d("arg5 : "..sheepSafe:nilSafe(arg5))
---	sheepSafe:d("arg5 : "..sheepSafe:nilSafe(type(arg5)))
---	sheepSafe:d("arg6 : "..sheepSafe:nilSafe(arg6))
---	sheepSafe:d("arg6 : "..sheepSafe:nilSafe(type(arg6)))
---	sheepSafe:d("arg7 : "..string.format("%E",arg7))
---	sheepSafe:d("arg7 : "..sheepSafe:nilSafe(type(arg7)))
---	sheepSafe:d("arg8 : "..string.format("%E",arg8))
---	sheepSafe:d("arg8 : "..sheepSafe:nilSafe(type(arg8)))
---	sheepSafe:d("arg9 : "..sheepSafe:nilSafe(arg9))
---	sheepSafe:d("arg9 : "..sheepSafe:nilSafe(type(arg9)))
---	sheepSafe:d("arg10 : "..string.format("%E",arg10))
---	sheepSafe:d("arg10 : "..sheepSafe:nilSafe(type(arg10)))
---	sheepSafe:d("arg11 : "..sheepSafe:nilSafe(arg11))
---	sheepSafe:d("arg11 : "..sheepSafe:nilSafe(type(arg11)))
---	sheepSafe:d("arg12 : "..sheepSafe:nilSafe(arg12))
---	sheepSafe:d("arg12 : "..sheepSafe:nilSafe(type(arg12)))
---end
-
--- To solve the very strange behaviour on Elysium 
-function ZorlenX_mobIsBoss(unit)
-  local bosses = {}
-  local unitName = UnitName(unit)
-  bosses["Scarlet Commander Mograine"] = true
-  bosses["High Inquisitor Whitemane"] = true
-  bosses["Nekrum Gutchewer"] = true
-  bosses["Shadowpriest Sezz'ziz"] = true
-  bosses["Chief Ukorz Sandscalp"] = true
-  bosses["Ruuzlu"] = true
-  if UnitClassification("target") == "worldboss" or bosses[unitName] then
-    return true
-  end
-  return false
-end
--- test function
-function SheepSafe_getAllNearbyEnemies()
-  if not UnitExists("target") and not UnitIsUnit("target", "playertarget") then
-    TargetNearestEnemy()
-    return true
-  end
-  for i = 1, 10 do
-    TargetNearestEnemy()
-    sheepSafe:p("nr "..i.." is "..UnitName("target"));
-    if UnitIsUnit("target", "playertarget") then
-      break
-    end
-  end
-end
-
-GetAllNearbyEnemies = SheepSafe_getAllNearbyEnemies

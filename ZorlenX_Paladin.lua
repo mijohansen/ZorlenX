@@ -36,7 +36,7 @@ function ZorlenX_Paladin(dps, dps_pet, heal, rez, buff)
 		stopAttack()
 	end
 	
-  if Nok_SealWisdom() then
+  if ZorlenX_SealWisdom() then
     return true
   end
   
@@ -64,7 +64,7 @@ function LazyPigMultibox_MultiSeal(dmg)
   end
 end
 
-function Nok_SealWisdom()
+function ZorlenX_SealWisdom()
   local target_hp = MobHealth_GetTargetCurHP()
   if not target_hp then
     target_hp = 0
@@ -128,7 +128,7 @@ function LazyPigMultibox_SmartSkillPaladin()
 	elseif not unit_help or not UnitAffectingCombat(unit_help) then
     return false
     
-	elseif not Nok_UnitIsTank(unit_help) and Zorlen_IsSpellKnown("Blessing of Protection") and Zorlen_HealthPercent(unit_help) < 20 and CheckInteractDistance(unit_help, 1) and not Zorlen_checkDebuffByName("Forbearance", unit_help) and not Zorlen_checkBuffByName("Blessing of Protection", unit_help) and LazyPigMultibox_TargetUnit(unit_help) and Zorlen_castSpellByName("Blessing of Protection") then
+	elseif not ZorlenX_UnitIsTank(unit_help) and Zorlen_IsSpellKnown("Blessing of Protection") and Zorlen_HealthPercent(unit_help) < 20 and CheckInteractDistance(unit_help, 1) and not Zorlen_checkDebuffByName("Forbearance", unit_help) and not Zorlen_checkBuffByName("Blessing of Protection", unit_help) and LazyPigMultibox_TargetUnit(unit_help) and Zorlen_castSpellByName("Blessing of Protection") then
 		LazyPigMultibox_Annouce("lpm_slaveannouce","Blessing of Protection - "..GetUnitName(unit_help))
 		LazyPigMultibox_Message("Blessing of Protection - "..GetUnitName(unit_help))	
 		return true
@@ -227,7 +227,7 @@ function LazyPigMultibox_SmartIntervention()
 	return
 end
 
-function Nok_WisdomJudgement()
+function ZorlenX_WisdomJudgement()
   if Zorlen_isEnemy("target") then
     if not LazyPigMultibox_IsSpellInRangeAndActionBar("Judgement") then
       return false
