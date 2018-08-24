@@ -1,6 +1,7 @@
 function ZorlenX_OnLoad()
   ZorlenX_resetCombatScanner()
   sheepSafe:OnLoad()
+  ZorlenX_createMacros()
 end
 
 function ZorlenX_OnEvent(event)
@@ -41,21 +42,21 @@ function ZorlenX_UseClassScript()
     local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
     local playerIsSlave = not ZorlenX_PlayerIsLeader() and LazyPigMultibox_SlaveCheck()
     if not LPMULTIBOX.STATUS then
+      ZorlenX_Logging("LPMULTIBOX.STATUS is turned off.")
       return
     end
 
     if playerIsSlave and not Zorlen_isChanneling() and not Zorlen_isCasting() then
       -- added support for Decursive, just running the script when not Channeling or casting
       if Dcr_Clean(false,false) then
-        return
-      end
-      if not UnitAffectingCombat("player") then
+        ZorlenX_Logging("Tried to decursive.")
         return
       end
       -- performing combat scan
       local COMBAT_SCANNER = ZorlenX_CombatScan()
       -- added support for SheepSafe, just running the script when not Channeling or casting
-      if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.activeLooseEnemyCount > 1) and ZorlenX_SheepSafeUntargeted() then 
+      if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.activeLooseEnemyCount > 1) and ZorlenX_SheepSafeUntargeted() then
+        ZorlenX_Logging("Tried to sheepsafe.")
         return 
       end
 
@@ -109,6 +110,8 @@ function ZorlenX_UseClassScript()
     end
 
     return nil
+  else
+    return
   end	
 end
 
@@ -241,12 +244,23 @@ function ZorlenX_mobIsBoss(unit)
   end
   return false
 end
-
+-- Zorlen_MakeMacro(name, macro, percharacter, macroicontecture, iconindex, replace, show, nocreate, replacemacroindex, replacemacroname)
+function ZorlenX_createMacros()
+  Zorlen_MakeMacro(".DPS", "/script ZorlenX_UseClassScript()",  0, "Hunter_SniperShot", nil, 1, 1, nil)
+  Zorlen_MakeMacro(".DPS2", "/script ZorlenX_UseClassScript()", 0, "Hunter_SniperShot", nil, 1, 1, nil)
+  Zorlen_MakeMacro(".AOE", "/script ZorlenX_UseClassScript()" , 0, "Hunter_SniperShot", nil, 1, 1, nil)
+  Zorlen_MakeMacro(".PREP", "/script ZorlenX_OutOfCombat()"   , 0, "Hunter_SniperShot", nil, 1, 1, nil)
+  Zorlen_MakeMacro(".Follow", "/script ZorlenX_OutOfCombat()" , 0, "Hunter_SniperShot", nil, 1, 1, nil)
+end
 
 ----------------- debug utilities -------
 function ZorlenX_Debug(value)
   DEFAULT_CHAT_FRAME:AddMessage("---")
   DEFAULT_CHAT_FRAME:AddMessage(to_string(value))
+end
+
+function ZorlenX_Logging(msg,value)
+  ChatFrame3:AddMessage(msg,to_string(value))
 end
 
 function table_print (tt, indent, done)

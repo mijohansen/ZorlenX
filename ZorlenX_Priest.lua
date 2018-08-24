@@ -1,4 +1,4 @@
-function ZorlenX_Priest(dps, dps_pet, heal, rez, buff)
+function ZorlenX_Priest(dps, dps_pet, heal)
 	
 	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
 	local shadow_form = Zorlen_checkBuffByName("Shadowform", "player")
@@ -7,22 +7,21 @@ function ZorlenX_Priest(dps, dps_pet, heal, rez, buff)
 		return
 	end
 	
-	if rez and not shadow_form and LazyPigMultibox_Rez() then
-			return
-	end
 	
 	if heal and not shadow_form then
-		QuickHeal();
-	end
-	
-	if buff then
-		LazyPigMultibox_UnitBuff();
+		local result = QuickHeal()
+    if Zorlen_isCasting() then
+      ZorlenX_Logging("Casting heal with QuickHeal")
+      return
+    end
 	end
 	
 	if not heal and not shadow_form and Zorlen_castSpellByName("Shadowform") then
+    ZorlenX_Logging("Aquiring ShadowForm.")
 		return
 		
 	elseif castInnerFire() then
+    ZorlenX_Logging("Aquiring InnerFire.")
 		return
 		
 	elseif UnitAffectingCombat("player") and (Zorlen_isEnemyTargetingYou("target") or Zorlen_HealthPercent("player") < 50) and (LazyPig_Raid() or LazyPig_Dungeon() or Zorlen_HealthPercent("player") < 75) and (Zorlen_checkCooldownByName("Fade") or Zorlen_checkCooldownByName("Power Word: Shield") or Zorlen_checkCooldownByName("Stoneform")) then 
@@ -42,7 +41,9 @@ function ZorlenX_Priest(dps, dps_pet, heal, rez, buff)
   else
     if heal and not isShootActive() then
       -- just do some extra Wanding when in healmode
-      castShoot();
+      ZorlenX_Logging("Starting to use wand.")
+      targetLowestHP()
+      castShoot()
     end
 	end
 end
