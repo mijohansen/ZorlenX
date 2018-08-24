@@ -1,23 +1,15 @@
 COMBAT_SCANNER = {}
 
-function ZorlenX_ccIsApplied(cc_spellname)
-  return COMBAT_SCANNER.ccsApplied[cc_spellname]
-end
+-- @TODO Need to implement range check
+-- @TODO Need to implement 
 
--- /script local cs = ZorlenX_CombatScan() ZorlenX_Debug(cs)
--- UntargetedTarget
-function ZorlenX_CombatScan()
-  if COMBAT_SCANNER.lastScanTime and (COMBAT_SCANNER.lastScanTime + 1) > GetTime() then
-    return COMBAT_SCANNER
-  end
-  if self == nil then
-    self = sheepSafe
-  end
-  -- resetting values
+function ZorlenX_resetCombatScanner()
   COMBAT_SCANNER.lastScanDuration = 0
   COMBAT_SCANNER.lastScanCount = 0
   COMBAT_SCANNER.lastScanTime = GetTime()
   COMBAT_SCANNER.activeLooseEnemyCount = 0
+  COMBAT_SCANNER.enemiesTargetingYouCount = 0
+  COMBAT_SCANNER.castersWithAggroCount = 0
   COMBAT_SCANNER.myCCApplied = false
   COMBAT_SCANNER.highestHealth = nil
   COMBAT_SCANNER.lowestHealth = nil
@@ -27,6 +19,21 @@ function ZorlenX_CombatScan()
   COMBAT_SCANNER.targetAttackingCloth = false
   COMBAT_SCANNER.ccAbleTargetExists = false
   COMBAT_SCANNER.ccsApplied = {}
+end
+
+function ZorlenX_ccIsApplied(cc_spellname)
+  return COMBAT_SCANNER.ccsApplied[cc_spellname]
+end
+-- /script local cs = ZorlenX_CombatScan() ZorlenX_Debug(cs)
+function ZorlenX_CombatScan()
+  if COMBAT_SCANNER.lastScanTime and (COMBAT_SCANNER.lastScanTime + 1) > GetTime() then
+    return COMBAT_SCANNER
+  end
+  if self == nil then
+    self = sheepSafe
+  end
+  -- resetting values
+  ZorlenX_resetCombatScanner()
 
   --defining some locals
   local activeLooseEnemies = {}
@@ -124,7 +131,7 @@ function targetHighestHP()
 end
 
 function targetEnemyAttackingMe()
-  if not COMBAT_SCANNER.enemiesTargetingYouCount > 0 then
+  if not (COMBAT_SCANNER.enemiesTargetingYouCount > 0) then
     return false
   end
   for i = 1, 6 do
@@ -136,7 +143,7 @@ function targetEnemyAttackingMe()
 end
 
 function targetEnemyAggroingCasters()
-  if not COMBAT_SCANNER.castersWithAggroCount > 0 then
+  if not (COMBAT_SCANNER.castersWithAggroCount > 0) then
     return false
   end
   for i = 1, 6 do
@@ -214,7 +221,7 @@ function ZorlenX_isUnitCCable(unit)
     return false
   end
 
-  if self.class ~= "WARLOCK" and sheepSafe:IsDotted() then
+  if not isWarlock("player") and sheepSafe:IsDotted() then
     return false
   end
   -- ok this seem to be a good target...

@@ -1,30 +1,25 @@
-
+function ZorlenX_OnLoad()
+  ZorlenX_resetCombatScanner()
+  sheepSafe:OnLoad()
+end
 
 function ZorlenX_OnEvent(event)
-	if(event == "CHAT_MSG_ADDON" and arg4 ~= GetUnitName("player")) then
-		-- routing everything through the LPM announce function
-		ZorlenX_MessageReceiver(arg1, arg2, arg4);
-		LazyPigMultibox_Annouce(arg1, arg2, arg4);
-	end
-	sheepSafe:OnEvent()
+  if(event == "CHAT_MSG_ADDON" and arg4 ~= GetUnitName("player")) then
+    -- routing everything through the LPM announce function
+    ZorlenX_MessageReceiver(arg1, arg2, arg4);
+    LazyPigMultibox_Annouce(arg1, arg2, arg4);
+  end
+  sheepSafe:OnEvent()
 end
-	
+
 -- for anouncements still use LazyPigMultibox_Annouce(mode, message, sender)
 function ZorlenX_MessageReceiver(mode, message, sender)
-	local sender_name = sender or "Player"
-	if mode == "zorlenx_request_trade" then
-		ZorlenX_RequestSmartTrade(message,sender_name);
-	end 
+  local sender_name = sender or "Player"
+  if mode == "zorlenx_request_trade" then
+    ZorlenX_RequestSmartTrade(message,sender_name);
+  end 
 end
 
-function ZorlenX_PlayerIsLeader()
-  local leader = LazyPigMultibox_ReturnLeaderUnit()
-  return (leader and UnitIsUnit("player", leader))
-end
-
-function ZorlenX_PlayerInGrouped()
-  return (GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0)
-end
 
 function isSoftTarget(unit)
   if isMage(unit) or isWarlock(unit) or isPriest(unit) or isHunter(unit) or isRogue(unit) then
@@ -41,7 +36,6 @@ function ZorlenX_UseClassScript()
   local time = GetTime()
   if LPM_TIMER.SCRIPT_USE < time then	
     LPM_TIMER.SCRIPT_USE = time + 0.5
-    local rez = LPMULTIBOX.SCRIPT_REZ
     local dps = LPMULTIBOX.SCRIPT_DPS
     local dps_pet = LPMULTIBOX.SCRIPT_DPSPET
     local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
@@ -49,51 +43,50 @@ function ZorlenX_UseClassScript()
     if not LPMULTIBOX.STATUS then
       return
     end
-    ZorlenX_Debug(LPMULTIBOX)
+
     if playerIsSlave and not Zorlen_isChanneling() and not Zorlen_isCasting() then
       -- added support for Decursive, just running the script when not Channeling or casting
       if Dcr_Clean(false,false) then
         return
       end
+      if not UnitAffectingCombat("player") then
+        return
+      end
       -- performing combat scan
-      local COMBAT = ZorlenX_CombatScan()
+      local COMBAT_SCANNER = ZorlenX_CombatScan()
       -- added support for SheepSafe, just running the script when not Channeling or casting
-      if COMBAT_SCANNER.ccAbleTargetExists and COMBAT_SCANNER.activeLooseEnemyCount > 1 and SheepSafeUntargeted() then 
+      if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.activeLooseEnemyCount > 1) and ZorlenX_SheepSafeUntargeted() then 
         return 
       end
-      -- LazyPigMultibox_AssistMaster() ingen targeting foregår før class scripts
-      if dps or dps_pet or heal or rez then
-        local class = UnitClass("player")
-        dps = dps and Zorlen_isEnemy("target") and ( ZorlenX_PlayerInGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
-        rez = rez and not UnitAffectingCombat("player")
 
-        if isPaladin() then
-          ZorlenX_Paladin(dps, dps_pet, heal, rez);
-          
-        elseif isShaman() then
-          ZorlenX_Shaman(dps, dps_pet, heal, rez);
-          
-        elseif isDruid() then
-          ZorlenX_Druid(dps, dps_pet, heal, rez);	
-          
-        elseif isPriest() then
-          ZorlenX_Priest(dps, dps_pet, heal, rez);
-          
-        elseif isWarlock() then
-          ZorlenX_Warlock(dps, dps_pet, heal, rez);
-          
-        elseif isMage() then
-          ZorlenX_Mage(dps, dps_pet, heal, rez);
-          
-        elseif isHunter() then
-          ZorlenX_Hunter(dps, dps_pet, heal, rez);
-          
-        elseif isRogue() then
-          ZorlenX_Rogue(dps, dps_pet, heal, rez);
-          
-        elseif isWarrior() then
-          ZorlenX_Warrior(dps, dps_pet, heal, rez);
-          
+
+
+      --  ingen targeting foregår før class scripts
+      if dps or dps_pet or heal  then
+        --doing some default selection when
+        if COMBAT_SCANNER.activeLooseEnemyCount == 1 then
+          LazyPigMultibox_AssistMaster()
+        end
+
+        dps = dps and Zorlen_isEnemy("target") and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
+        if isPaladin("player") then
+          ZorlenX_Paladin(dps, dps_pet, heal);
+        elseif isShaman("player") then
+          --ZorlenX_Shaman(dps, dps_pet, heal);
+        elseif isDruid("player") then
+          ZorlenX_Druid(dps, dps_pet, heal);	
+        elseif isPriest("player") then
+          ZorlenX_Priest(dps, dps_pet, heal);
+        elseif isWarlock("player") then
+          ZorlenX_Warlock(dps, dps_pet, heal);
+        elseif isMage("player") then
+          ZorlenX_Mage(dps, dps_pet, heal);
+        elseif isHunter("player") then
+          --ZorlenX_Hunter(dps, dps_pet, heal);
+        elseif isRogue("player") then
+          --ZorlenX_Rogue(dps, dps_pet, heal);
+        elseif isWarrior("player") then
+          --ZorlenX_Warrior(dps, dps_pet, heal);
         end
         return true
       end	
@@ -126,15 +119,10 @@ function FollowLeader()
   end
 end
 
-function isGrouped()
-  return GetNumPartyMembers() > 0 or UnitInRaid("player")
-end
-
-
 
 
 function ZorlenX_OutOfCombat()
-  if isDrinkingActive() and Zorlen_ManaPercent("player") > 95  then
+  if isDrinkingActive() and Zorlen_ManaPercent("player") > 95 then
     SitOrStand()
   end
 
@@ -146,7 +134,7 @@ function ZorlenX_OutOfCombat()
     return
   end
 
-  if not Zorlen_isMoving() and LazyPigMultibox_Rez() then
+  if LPMULTIBOX.SCRIPT_REZ and not Zorlen_isMoving() and LazyPigMultibox_Rez() then
     return 
   end
 
@@ -165,6 +153,15 @@ function ZorlenX_OutOfCombat()
   if Zorlen_Drink() then
     return
   end
+end
+
+function ZorlenX_PlayerIsLeader()
+  local leader = LazyPigMultibox_ReturnLeaderUnit()
+  return (leader and UnitIsUnit("player", leader))
+end
+
+function isGrouped()
+  return GetNumPartyMembers() > 0 or UnitInRaid("player")
 end
 
 function ZorlenX_UnitIsTank(unit)
@@ -246,11 +243,7 @@ function ZorlenX_mobIsBoss(unit)
 end
 
 
-
-
-
-
------------------ utilities -------
+----------------- debug utilities -------
 function ZorlenX_Debug(value)
   DEFAULT_CHAT_FRAME:AddMessage("---")
   DEFAULT_CHAT_FRAME:AddMessage(to_string(value))

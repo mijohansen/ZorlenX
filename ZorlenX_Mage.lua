@@ -1,23 +1,28 @@
 -- at this point lacks target.
 function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
-	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
-	
-	if locked then
-		return true
-	end
+
+  local locked = Zorlen_isChanneling() or Zorlen_isCasting()
   
+  if locked then
+    return true
+  end
+
   if ZorlenX_MageRestoreMana() then
     return true
   end
-  
+
   -- added evocation on low mana.
   if ZorlenX_MageOnLowManaEvocation() then
     return true
   end
   
+  if targetEnemyAggroingCasters() and castFrostbolt(1) then
+    return true
+  end
+  
   if ZorlenX_MageDPS() then
     return true
-	end
+  end
 end
 
 -- target mob that aggroes cloth with a frost bolt.
@@ -71,7 +76,7 @@ function ZorlenX_MageDPS()
   if castFireBlast()  then
     return true
   end
-  
+
   if castFireball() then
     return true
   end
@@ -82,21 +87,21 @@ function ZorlenX_MageDPS()
 end
 
 function ZorlenX_MageConjure()
-		if UnitAffectingCombat("player") then
-			return
-		end
-    if Zorlen_isChanneling() or Zorlen_isCasting() then
-      return
-    end
-    if Zorlen_GiveContainerItemCountByName("Conjured Spring Water") < 60 then 
-      return Zorlen_castSpellByName("Conjure Water")
-    end
-    if Zorlen_IsSpellKnown("Conjure Mana Jade") and not manaJadeExists() then 
-      return Zorlen_castSpellByName("Conjure Mana Jade")
-    end
-    if Zorlen_IsSpellKnown("Conjure Mana Agate") and not manaAgateExists() then 
-      return Zorlen_castSpellByName("Conjure Mana Agate")
-    end
+  if UnitAffectingCombat("player") then
+    return
+  end
+  if Zorlen_isChanneling() or Zorlen_isCasting() then
+    return
+  end
+  if Zorlen_GiveContainerItemCountByName("Conjured Spring Water") < 60 then 
+    return Zorlen_castSpellByName("Conjure Water")
+  end
+  if Zorlen_IsSpellKnown("Conjure Mana Jade") and not manaJadeExists() then 
+    return Zorlen_castSpellByName("Conjure Mana Jade")
+  end
+  if Zorlen_IsSpellKnown("Conjure Mana Agate") and not manaAgateExists() then 
+    return Zorlen_castSpellByName("Conjure Mana Agate")
+  end
 end
 
 function manaAgateExists()

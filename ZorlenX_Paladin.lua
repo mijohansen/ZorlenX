@@ -5,22 +5,22 @@ local unique_judgement = "Judgement of Wisdom"
 --local unique_seal = "Seal of Righteousness"
 
 
-function ZorlenX_Paladin(dps, dps_pet, heal, rez, buff)
+function ZorlenX_Paladin(dps, dps_pet, heal)
 	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
 	
 	if locked  then
 		return true
 	end
-	
+  
+  if targetEnemyAggroingCasters() and castHammerOfJustice() then
+    return true
+  end
+  
 	if LazyPigMultibox_SmartSkillPaladin() then 
 		return
 	end
 	
-	if rez then
-		if LazyPigMultibox_Rez() then
-			return
-		end
-	end
+
 	
 	if heal and QuickHeal() then
     TargetUnit("playertarget") --trying to fix overheal issue by reselecting the player target
@@ -239,4 +239,14 @@ function ZorlenX_WisdomJudgement()
       return castJudgement()
     end
   end
+end
+
+
+function castHammerOfJustice(SpellRank)
+	local z = {}
+	z.Rank = SpellRank
+	z.SpellName = LOCALIZATION_ZORLEN.HammerOfJustice
+	z.DebuffName = z.SpellName
+	z.DebuffTimer = 1
+	return Zorlen_CastCommonRegisteredSpell(z)
 end

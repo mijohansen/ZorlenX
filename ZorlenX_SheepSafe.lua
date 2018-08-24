@@ -92,27 +92,15 @@ sheepSafe.damageEvents["CHAT_MSG_SPELL_PET_DAMAGE"] = true
 sheepSafeConfig = {}
 
 function sheepSafe:OnLoad()
-
    sheepSafe:chat("SheepSafe v"..self.version.." loaded.  Baaaahhhh.")
    this:RegisterEvent("PLAYER_ENTERING_WORLD")
    this:RegisterEvent("PLAYER_LEAVING_WORLD")
    this:RegisterEvent("VARIABLES_LOADED")
---   this:RegisterEvent("ADDON_LOADED")
-   
    SLASH_SHEEPSAFE1="/sheepsafe";
    SlashCmdList["SHEEPSAFE"] = self.Command;
-   
 end
 
 function sheepSafe:OnEvent()
---sheepSafe:chat("event : "..event)
---sheepSafe:chat("arg1 : "..sheepSafe:nilSafe(arg1))
---sheepSafe:chat("sheepBrokeTime : "..tostring(sheepSafe.sheepBrokeTime).." curtime : "..tostring(GetTime()).." molester : "..sheepSafe.sheepMolester)
---sheepSafe:chat("sheepHitTime : "..tostring(sheepSafe.sheepHitTime))
---   	if self.cc and arg1 and string.find(arg1, self.cc.." is removed.") then
---  		sheepSafe:d("found "..self.cc.." is removed.")
---	end
-
    if (event ==	"PLAYER_ENTERING_WORLD") then
 	this:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 	this:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -128,19 +116,15 @@ function sheepSafe:OnEvent()
 	end
 
    elseif (event == "VARIABLES_LOADED" ) then
---   elseif (event == "ADDON_LOADED" and arg1 == "SheepSafe") then
 	if not sheepSafe.ConfigDefaults then
 		self:SetDefaults()
 	end
    	if not sheepSafeConfig then
    		sheepSafeConfig = {}
---   		sheepSafe:chat("created sheepSafeConfig")
    	end
 	for key, value in pairs(sheepSafe.ConfigDefaults) do
---		sheepSafe:chat("def key : "..key.." def value : "..sheepSafe:BtoS(value).." curvalue : "..sheepSafe:BtoS(sheepSafeConfig[key]))
 		if (sheepSafeConfig[key] == nil) then
 			sheepSafeConfig[key] = value;
---			sheepSafe:chat("key : "..key.." set to value : "..sheepSafe:BtoS(value))
 		end
 	end
 	self:SetClassDefaults()
@@ -443,29 +427,17 @@ function sheepSafe.scheduler.CheckQueue()
 end
 
 
-function sheepSafe:SheepSafeUntargeted()
+function ZorlenX_SheepSafeUntargeted()
   if self == nil then
    	self = sheepSafe
   end
-  local result = false
-  local junk, englishClass = UnitClass("player");
-  -- disabling checks for classes that don't CC
   if not self.cc then
-    return result
+    return false
   end
   if UnitAffectingCombat("player") and ZorlenX_FindUntargetedTarget() then 
-    sheepSafe:SheepSafe()
-    result = true
-  else
-    --local message
-    --message = "No undotted and untargetted targets to "..self.ccverb2.."!"
-    --sheepSafe:p(message)
-    TargetUnit("playertarget") --resetting playertarget
+    return sheepSafe:SheepSafe()
   end
-    return result
 end
-
-SheepSafeUntargeted = sheepSafe.SheepSafeUntargeted
 
 
 -- Utilities
@@ -503,9 +475,7 @@ function ZorlenX_IsCrowdControlled()
 		tdb = UnitDebuff("target",i);
 		if tdb then
 			stripped = string.sub(tdb,17)
-			sheepSafe:d(stripped);
-			if self.ccs[stripped] then
-				sheepSafe:d("already cc'd");
+			if sheepSafe.ccs[stripped] then
 				return true;
 			end
 		else
@@ -609,30 +579,24 @@ end
 function sheepSafe:IsDotted()
 	local tdb
 	local stripped
-	--sheepSafe:d("checking debuffs for "..UnitName("target"));
 	for i=1,16 do
 		tdb = UnitDebuff("target",i);
 		if tdb then
 			stripped = string.sub(tdb,17)
-			sheepSafe:d(stripped);
 			if self.dots[stripped] then
-				sheepSafe:d("dotted");
-				return true;
+				return true
 			end
 		else
-			return false;
+			return false
 		end
 	end
 end
 
 function sheepSafe:SendMessage(message)
-
 	if ((GetTime() - self.lastMessage) <= self.coolDown) then
 		return
 	end
-
 	self.lastMessage = GetTime()
-
 	if not sheepSafeConfig.alert then
 		sheepSafe:p(message)
 	elseif (GetNumRaidMembers() > 0) then
@@ -642,7 +606,6 @@ function sheepSafe:SendMessage(message)
 	else
 		sheepSafe:p(message)
 	end
-	
 end
 
 function sheepSafe:CreateMacro()
@@ -652,7 +615,6 @@ function sheepSafe:CreateMacro()
 		macid =	CreateMacro("SheepSafe",iconid,"/script	SheepSafeCombo();",1,1)
 	end
 end
-
 
 function sheepSafe:FindIconId(iconpath)
 	for i =	1, GetNumMacroIcons() do
@@ -704,14 +666,12 @@ function sheepSafe:findSheepee(ar)
 end
 
 function sheepSafe:SetClassDefaults()
-  local junk, englishClass = UnitClass("player");
-  sheepSafe.class = englishClass;
   -- setting some defaults that can be used later
   if sheepSafeConfig.toggle == nil then
     sheepSafeConfig.toggle = true
   end
   self.cc = false
-  if englishClass == "MAGE" then
+  if isMage("player") then
     self.cc	= "Polymorph";
     self.preTargetSpell = "Detect Magic";
     self.ccicon = "Spell_Nature_Polymorph";
@@ -722,11 +682,10 @@ function sheepSafe:SetClassDefaults()
     if sheepSafeConfig.pretarget == nil then
       sheepSafeConfig.pretarget = true
     end
-    
     if sheepSafeConfig.tattle == nil then
       sheepSafeConfig.tattle = true
     end
-  elseif englishClass == "PRIEST" then
+  elseif isPriest("player") then
     self.cc	= "Shackle Undead";
     self.preTargetSpell = "Mind Vision";
     self.ccicon = "Spell_Nature_Slow";
@@ -740,7 +699,7 @@ function sheepSafe:SetClassDefaults()
     if sheepSafeConfig.tattle == nil then
       sheepSafeConfig.tattle = false
     end
-  elseif englishClass == "WARLOCK" then
+  elseif isWarlock("player") then
     self.cc	= "Banish";
     self.preTargetSpell = nil;
     self.ccicon = "Spell_Shadow_Cripple"
@@ -754,7 +713,7 @@ function sheepSafe:SetClassDefaults()
     if sheepSafeConfig.tattle == nil then
       sheepSafeConfig.tattle = false
     end
-  elseif englishClass == "DRUID" then
+  elseif isDruid("player") then
     self.cc	= "Hibernate";
     self.preTargetSpell = nil;
     self.ccicon = "Spell_Nature_Sleep";

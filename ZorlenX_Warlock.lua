@@ -37,11 +37,17 @@ function ZorlenX_Warlock(dps, dps_pet, heal, rez)
 	if locked then
 		return true
 	end
-
-	if dps then
-		if LazyPigMultibox_WarlockDPS(unique_curse) then
+  
+  if targetEnemyAggroingCasters() and castDeathCoil() then
+    return true
+  end
+  
+  if targetEnemyAggroingCasters() and castFear() then
+    return true
+  end
+  
+	if dps and LazyPigMultibox_WarlockDPS(unique_curse) then
 			return
-		end	
 	end
 	
 	if Zorlen_ManaPercent("player") <= 70 and Zorlen_HealthPercent("player") > 75 and castLifeTap() then
