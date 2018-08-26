@@ -16,8 +16,13 @@ function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
     return true
   end
   
-  if targetEnemyAggroingCasters() and castFrostbolt(1) then
-    return true
+  if targetEnemyAggroingCasters() then
+    if Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) then
+      return true
+    else
+      -- targeting function is run, we go back to assist on Master target.
+      LazyPigMultibox_AssistMaster()
+    end
   end
   
   if ZorlenX_MageDPS() then

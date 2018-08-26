@@ -1,23 +1,41 @@
+--[[
+
+
+@TODO
+* TopMeOff functionalitey into the addon: https://github.com/Bergador/TopMeOff/blob/master/TopMeOff.lua
+* Autotrade from Master to Slaves. Slaves will allways have full stacks of stuff.
+* 
+
+]]
+
 function ZorlenX_OnLoad()
   ZorlenX_resetCombatScanner()
   sheepSafe:OnLoad()
-  ZorlenX_createMacros()
+  this:RegisterEvent("ADDON_LOADED")
+  this:RegisterEvent("PLAYER_LOGIN")
+  this:RegisterEvent("CHAT_MSG_ADDON")
 end
 
 function ZorlenX_OnEvent(event)
   if(event == "CHAT_MSG_ADDON" and arg4 ~= GetUnitName("player")) then
     -- routing everything through the LPM announce function
+    ZorlenX_Log("Message Received: " .. to_string({arg1, arg2, arg4}))
     ZorlenX_MessageReceiver(arg1, arg2, arg4);
     LazyPigMultibox_Annouce(arg1, arg2, arg4);
   end
-  sheepSafe:OnEvent()
+
+  if(event == "ADDON_LOADED") then
+    --just ensure that macros are created.
+    ZorlenX_Log("Updating macros")
+  end
+  sheepSafe:OnEvent(event)
 end
 
 -- for anouncements still use LazyPigMultibox_Annouce(mode, message, sender)
 function ZorlenX_MessageReceiver(mode, message, sender)
   local sender_name = sender or "Player"
   if mode == "zorlenx_request_trade" then
-    ZorlenX_RequestSmartTrade(message,sender_name);
+    ZorlenX_RequestSmartTrade(message,sender_name)
   end 
 end
 
@@ -32,8 +50,18 @@ function isSoftTarget(unit)
   return false
 end
 
+-- Eventhough I can count active enemies there will be need to solve for
+-- CC etc.
+function ZorlenX_DpsMultiTarget()
+  return ZorlenX_UseClassScript(true)
+end
+
+function ZorlenX_DpsSingleTarget()
+  return ZorlenX_UseClassScript()
+end
+
 -- /script ZorlenX_UseClassScript()
-function ZorlenX_UseClassScript()
+function ZorlenX_UseClassScript(multitarget)
   local time = GetTime()
   if LPM_TIMER.SCRIPT_USE < time then	
     LPM_TIMER.SCRIPT_USE = time + 0.5
@@ -42,33 +70,32 @@ function ZorlenX_UseClassScript()
     local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
     local playerIsSlave = not ZorlenX_PlayerIsLeader() and LazyPigMultibox_SlaveCheck()
     if not LPMULTIBOX.STATUS then
-      ZorlenX_Logging("LPMULTIBOX.STATUS is turned off.")
+      ZorlenX_Log("LPMULTIBOX.STATUS is turned off.")
       return
     end
 
-    if playerIsSlave and not Zorlen_isChanneling() and not Zorlen_isCasting() then
+    if playerIsSlave and not Zorlen_isCastingOrChanneling() then
       -- added support for Decursive, just running the script when not Channeling or casting
       if Dcr_Clean(false,false) then
-        ZorlenX_Logging("Tried to decursive.")
+        ZorlenX_Log("Tried to decursive.")
         return
       end
       -- performing combat scan
       local COMBAT_SCANNER = ZorlenX_CombatScan()
       -- added support for SheepSafe, just running the script when not Channeling or casting
       if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.activeLooseEnemyCount > 1) and ZorlenX_SheepSafeUntargeted() then
-        ZorlenX_Logging("Tried to sheepsafe.")
+        -- ZorlenX_Debug(COMBAT_SCANNER)
+        ZorlenX_Log("Tried to sheepsafe.")
         return 
       end
-
 
 
       --  ingen targeting foregår før class scripts
       if dps or dps_pet or heal  then
         --doing some default selection when
         if COMBAT_SCANNER.activeLooseEnemyCount == 1 then
-          LazyPigMultibox_AssistMaster()
         end
-
+        LazyPigMultibox_AssistMaster()
         dps = dps and Zorlen_isEnemy("target") and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
         if isPaladin("player") then
           ZorlenX_Paladin(dps, dps_pet, heal);
@@ -115,17 +142,24 @@ function ZorlenX_UseClassScript()
   end	
 end
 
+-- 
 function FollowLeader()
-  if isGrouped() then
+  if isGrouped() and not Zorlen_isCastingOrChanneling() and  then
     local leader = LazyPigMultibox_ReturnLeaderUnit()
     FollowUnit(leader)
   end
 end
 
 
-
+local ZorlenX_OutOfCombatLastRun
 function ZorlenX_OutOfCombat()
-  if isDrinkingActive() and Zorlen_ManaPercent("player") > 95 then
+  -- Doing some spam avoide here.
+  if ZorlenX_OutOfCombatLastRun and (ZorlenX_OutOfCombatLastRun + 1) > GetTime() then
+    return true
+  end
+  ZorlenX_OutOfCombatLastRun = GetTime()
+
+  if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
     SitOrStand()
   end
 
@@ -133,10 +167,13 @@ function ZorlenX_OutOfCombat()
     return
   end
 
+  if ZorlenX_DruidEnsureCasterForm() then
+    return true
+  end
+
   if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
     return
   end
-
   if LPMULTIBOX.SCRIPT_REZ and not Zorlen_isMoving() and LazyPigMultibox_Rez() then
     return 
   end
@@ -150,9 +187,13 @@ function ZorlenX_OutOfCombat()
   end
 
   if LPMULTIBOX.SCRIPT_BUFF and LazyPigMultibox_UnitBuff() then
+    ZorlenX_Log("Buffing complete", LPMULTIBOX)
     return
   end
 
+  if Zorlen_isMoving() and Zorlen_ManaPercent("player") > 90 then 
+    -- throw som hots around.
+  end
   if Zorlen_Drink() then
     return
   end
@@ -177,6 +218,17 @@ function ZorlenX_GetTargetCurHP()
     target_hp = 0
   end
   return target_hp
+end
+
+function ZorlenX_PetAttack()
+  if Zorlen_isActiveEnemy("target") then
+    if not LazyPigMultibox_CheckDelayMode(true) or not UnitExists("pettarget") or UnitIsPartyLeader("player") then
+      PetAttack()
+    end	
+  elseif not LazyPigMultibox_UtilizeTarget() then
+    PetPassiveMode()
+    PetFollow()
+  end
 end
 
 function ZorlenX_IsTotem(unit)
@@ -245,13 +297,20 @@ function ZorlenX_mobIsBoss(unit)
   return false
 end
 -- Zorlen_MakeMacro(name, macro, percharacter, macroicontecture, iconindex, replace, show, nocreate, replacemacroindex, replacemacroname)
+-- Zorlen_MakeMacro(LOCALIZATION_ZORLEN.EatMacroName, "/zorlen eat", 0, "Spell_Misc_Food", nil, 1, show)
+-- /script ZorlenX_createMacros()
 function ZorlenX_createMacros()
-  Zorlen_MakeMacro(".DPS", "/script ZorlenX_UseClassScript()",  0, "Hunter_SniperShot", nil, 1, 1, nil)
-  Zorlen_MakeMacro(".DPS2", "/script ZorlenX_UseClassScript()", 0, "Hunter_SniperShot", nil, 1, 1, nil)
-  Zorlen_MakeMacro(".AOE", "/script ZorlenX_UseClassScript()" , 0, "Hunter_SniperShot", nil, 1, 1, nil)
-  Zorlen_MakeMacro(".PREP", "/script ZorlenX_OutOfCombat()"   , 0, "Hunter_SniperShot", nil, 1, 1, nil)
-  Zorlen_MakeMacro(".Follow", "/script ZorlenX_OutOfCombat()" , 0, "Hunter_SniperShot", nil, 1, 1, nil)
+  Zorlen_MakeMacro("1DPS", "/script ZorlenX_UseClassScript()", 0, "Ability_Druid_Maul", nil, 1,1)
+  Zorlen_MakeMacro("2DPS", "/script ZorlenX_UseClassScript()", 0, "Ability_Druid_Bash", nil, 1,1)
+  Zorlen_MakeMacro("3AOE", "/script ZorlenX_UseClassScript()" , 0, "Ability_Whirlwind", nil, 1,1)
+  Zorlen_MakeMacro("4OUT", "/script ZorlenX_OutOfCombat()"   , 0, "Spell_Misc_Drink", nil, 1,1)
+  Zorlen_MakeMacro("0FOL", "/script FollowLeader()"         , 0, "Ability_Rogue_Sprint", nil, 1,1)
+  Zorlen_MakeMacro("RELOADUI", "/console reloadui", 0, "Ability_Creature_Cursed_04", nil, 1, 1)
+  Zorlen_MakeMacro("LEADER", "/console LazyPigMultibox_MakeMeLeader()", 0, "Hunter_Sniper", nil, 1, 1)
+
 end
+
+
 
 ----------------- debug utilities -------
 function ZorlenX_Debug(value)
@@ -259,7 +318,7 @@ function ZorlenX_Debug(value)
   DEFAULT_CHAT_FRAME:AddMessage(to_string(value))
 end
 
-function ZorlenX_Logging(msg,value)
+function ZorlenX_Log(msg,value)
   ChatFrame3:AddMessage(msg,to_string(value))
 end
 

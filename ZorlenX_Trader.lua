@@ -1,30 +1,24 @@
 
+ZORLENX_TRADER = {}
 
-Zorlen_MakeMacro("RELOADUI", "/console reloadui", nil, "Ability_Creature_Cursed_04", nil, 1, 1)
-Zorlen_MakeMacro("FOLLOW", "/script FollowLeader()", nil, "Hunter_SniperShot", nil, 1, 1)
-
-local serve_time
 function ZorlenX_RequestSmartTrade(message,sender_name)
-  local time = GetTime()
-  if not serve_time then
-    serve_time = time - 1
-  end
-  if serve_time < time then
-    serve_time = time + 1
-  else 
+
+  if ZORLENX_TRADER.lastServed and ZORLENX_TRADER.lastServed + 2 > GetTime() then
     return false
   end
+
   if TradeFrame:IsVisible() then
     return AcceptTrade()
   end
 
   if message == "WATER" and ZorlenX_ServeDrinks(sender_name) then
+    ZORLENX_TRADER.lastServed = GetTime()
     return true
   elseif message == "HEALTHSTONE" and ZorlenX_ServeHealthstone(sender_name) then
-    player_is_serving = true
+    ZORLENX_TRADER.lastServed = GetTime()
     return true
   elseif message == "POTIONS" and ZorlenX_ServePortions(sender_name) then
-    player_is_serving = true
+    ZORLENX_TRADER.lastServed = GetTime()
     return true
   end
 end
@@ -47,7 +41,8 @@ function ZorlenX_OrderDrinks()
       fullcount = 0
     end
     if fullcount < 5 then
-      Zorlen_debug("Request water, only "..fullcount.." drinks left.")
+      ZorlenX_Log("Request water, only " .. fullcount .. " drinks left.")
+      SendAddonMessage("zorlenx_request_trade", "WATER", "RAID")
       return LazyPigMultibox_Annouce("zorlenx_request_trade", "WATER")
     end
   end

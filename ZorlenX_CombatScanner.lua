@@ -21,9 +21,7 @@ function ZorlenX_resetCombatScanner()
   COMBAT_SCANNER.ccsApplied = {}
 end
 
-function ZorlenX_ccIsApplied(cc_spellname)
-  return COMBAT_SCANNER.ccsApplied[cc_spellname]
-end
+
 -- /script local cs = ZorlenX_CombatScan() ZorlenX_Debug(cs)
 function ZorlenX_CombatScan()
   if COMBAT_SCANNER.lastScanTime and (COMBAT_SCANNER.lastScanTime + 1) > GetTime() then
@@ -63,7 +61,7 @@ function ZorlenX_CombatScan()
       COMBAT_SCANNER.totemExists = true
     end
 
-    local current_target_name = UnitName("target").." - "..UnitLevel("target")
+    local current_target_name = UnitName("target") .. " - " .. UnitLevel("target")
     if Zorlen_isEnemyTargetingYou() then
       enemiesTargetingYou[current_target_name] = 1
     end
@@ -71,6 +69,7 @@ function ZorlenX_CombatScan()
     if Zorlen_isActiveEnemy("target") and not targetIsCrowdControlled then
       activeLooseEnemies[current_target_name] = 1
       if ZorlenX_isUnitCCable("target") then
+        ZorlenX_Log(current_target_name .. " is ccAble.")
         COMBAT_SCANNER.ccAbleTargetExists = true
       end
     end
@@ -106,7 +105,9 @@ function ZorlenX_CombatScan()
   return COMBAT_SCANNER
 end
 
-
+function ZorlenX_ccIsApplied(cc_spellname)
+  return COMBAT_SCANNER.ccsApplied[cc_spellname]
+end
 
 function targetLowestHP()
   if not COMBAT_SCANNER.lowestHealth then
@@ -226,7 +227,6 @@ function ZorlenX_isUnitCCable(unit)
   end
   -- ok this seem to be a good target...
   if Zorlen_HealthPercent("target") > 60 and ZorlenX_GetTargetCurHP() > UnitHealthMax("player") then
-    sheepSafe:p(TargetName.." is an untargeted target.")
     return true
   end
 end 

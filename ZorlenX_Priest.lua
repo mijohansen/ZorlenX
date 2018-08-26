@@ -17,11 +17,11 @@ function ZorlenX_Priest(dps, dps_pet, heal)
 	end
 	
 	if not heal and not shadow_form and Zorlen_castSpellByName("Shadowform") then
-    ZorlenX_Logging("Aquiring ShadowForm.")
+    ZorlenX_Log("Aquiring ShadowForm.")
 		return
 		
 	elseif castInnerFire() then
-    ZorlenX_Logging("Aquiring InnerFire.")
+    ZorlenX_Log("Aquiring InnerFire.")
 		return
 		
 	elseif UnitAffectingCombat("player") and (Zorlen_isEnemyTargetingYou("target") or Zorlen_HealthPercent("player") < 50) and (LazyPig_Raid() or LazyPig_Dungeon() or Zorlen_HealthPercent("player") < 75) and (Zorlen_checkCooldownByName("Fade") or Zorlen_checkCooldownByName("Power Word: Shield") or Zorlen_checkCooldownByName("Stoneform")) then 
@@ -39,10 +39,9 @@ function ZorlenX_Priest(dps, dps_pet, heal)
 	if dps then
     ZorlenX_PriestDps()
   else
-    if heal and not isShootActive() then
+    if heal and not isShootActive() and targetLowestHP() then
       -- just do some extra Wanding when in healmode
-      ZorlenX_Logging("Starting to use wand.")
-      targetLowestHP()
+      ZorlenX_Log("Starting to use wand on target with lowest HP.")
       castShoot()
     end
 	end

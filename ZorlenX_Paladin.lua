@@ -12,9 +12,7 @@ function ZorlenX_Paladin(dps, dps_pet, heal)
 		return true
 	end
   
-  if targetEnemyAggroingCasters() and castHammerOfJustice() then
-    return true
-  end
+
   
 	if LazyPigMultibox_SmartSkillPaladin() then 
 		return
@@ -25,7 +23,11 @@ function ZorlenX_Paladin(dps, dps_pet, heal)
 	if heal and QuickHeal() then
     TargetUnit("playertarget") --trying to fix overheal issue by reselecting the player target
 	end
-	
+  
+  if targetEnemyAggroingCasters() and CheckInteractDistance("target", 3) and not Zorlen_isDieingEnemy("target") and castHammerOfJustice() then
+    return true
+  end
+  
 	if LazyPigMultibox_SmartWrath() then
 		return
 	end
@@ -39,18 +41,6 @@ function ZorlenX_Paladin(dps, dps_pet, heal)
   if ZorlenX_SealWisdom() then
     return true
   end
-  
-	--if unique_seal == "Seal of the Crusader" and LazyPigMultibox_SealCrusader(LPMULTIBOX.UNIQUE_SPELL, dps) then
-	--	return
-  --elseif LazyPigMultibox_SmartSeal(LPMULTIBOX.UNIQUE_SPELL, dps) then
-  --  return
-  --elseif LazyPigMultibox_MultiSeal(dps) then
-  --  return
-	--end
-	
-	if buff then
-		LazyPigMultibox_UnitBuff();
-	end
 
 end
 
