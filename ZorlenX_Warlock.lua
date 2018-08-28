@@ -9,8 +9,7 @@ local lpm_pet = "Imp"
 local lpm_warlock_curse = "Curse of the Elements"
 local lpm_firelock = true
 
-function ZorlenX_Warlock(dps, dps_pet, heal, rez)
-	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
+function ZorlenX_Warlock(dps, dps_pet, heal)
 	local manapercent = UnitMana("player") / UnitManaMax("player")
 	local healthpercent = UnitHealth("player") / UnitHealthMax("player")
 	local player_affected = UnitAffectingCombat("player")
@@ -34,7 +33,7 @@ function ZorlenX_Warlock(dps, dps_pet, heal, rez)
 		LazyPigMultibox_Annouce("lpm_slaveannouce","Sacrifice");
 	end
 	
-	if locked then
+	if Zorlen_isCastingOrChanneling() then
 		return true
 	end
   
@@ -52,15 +51,15 @@ function ZorlenX_Warlock(dps, dps_pet, heal, rez)
       return true
     else
       -- targeting function is run, we go back to assist on Master target.
-      LazyPigMultibox_AssistMaster()
+      ZorlenX_Log("Failed to deal with enemy targeting casters.")
     end
   end
   
-	if dps and LazyPigMultibox_WarlockDPS(unique_curse) then
+	if dps and targetMainTarget() and LazyPigMultibox_WarlockDPS(unique_curse) then
 			return
 	end
 	
-	if Zorlen_ManaPercent("player") <= 70 and Zorlen_HealthPercent("player") > 75 and castLifeTap() then
+	if Zorlen_ManaPercent("player") < 70 and Zorlen_HealthPercent("player") > 75 and castLifeTap() then
 		return
 	end	
 	
@@ -213,173 +212,3 @@ function LazyPigMultibox_WarlockFinisher()
 end
 
 
-
-function LazyPigMultibox_SetShardBagSize()
-	if not lpm_shard_bag then	
-		local ShardBagSize = 0
-		if NUM_BAG_FRAMES and NUM_BAG_FRAMES > 0 then
-			local SoulBagitemType = LOCALIZATION_ZORLEN["Soul Bag"]
-			local BagitemType = LOCALIZATION_ZORLEN.Bag
-			for bag=1,NUM_BAG_FRAMES do
-				local bagslots = GetContainerNumSlots(bag)
-				if bagslots and bagslots > 0 then
-					local itemType = Zorlen_GetItemSubType(GetInventoryItemLink("player", ContainerIDToInventoryID(bag)))
-					if itemType == SoulBagitemType then
-						ShardBagSize = ShardBagSize + bagslots
-
-					end
-				end
-			end
-		end
-		if ShardBagSize < 10 then
-			ShardBagSize = 10
-		end
-		lpm_shard_bag = ShardBagSize
-	end
-	return lpm_shard_bag
-end
-
-function LazyPigMultibox_CoilOnAggro()
-	if Zorlen_isEnemy("target") and UnitExists("targettarget") and UnitIsFriend("targettarget", "player") and UnitIsPlayer("targettarget") and CheckInteractDistance("target", 1) and Zorlen_checkCooldownByName("Death Coil") and (SpellStopCasting() or 1) and Zorlen_castSpellByName("Death Coil") then
-		LazyPigMultibox_Annouce("lpm_slaveannouce","Death Coil")
-		return true
-	end	
-	return false
-end
-
-function LazyPigMultibox_Summon()
-	local InRaid = UnitInRaid("player")
-	local PLAYER = "player"
-	local group = nil
-	local NumMembers = nil
-	local counter = nil
-	local u = nil
-		
-	if InRaid then
-		NumMembers = GetNumRaidMembers()
-		counter = 1
-		group = "raid"
-	else
-		NumMembers = GetNumPartyMembers()
-		counter = 0
-		group = "party"
-	end
-		
-	if IsAltKeyDown() and UnitHealth("target") > 0 and UnitIsConnected("target") then
-		Zorlen_castSpellByName("Ritual of Summoning")
-		LazyPigMultibox_Annouce("lpm_slaveannouce", "Summoning - Target: "..GetUnitName("target").." - Shards: "..Zorlen_GiveContainerItemCountByName("Soul Shard"))
-		return
-	else	
-		while counter <= NumMembers do
-			if counter == 0 then
-				u = PLAYER
-			else
-				u = group..""..counter
-			end
-			
-			if UnitExists(u) and not CheckInteractDistance(u, 1) and not UnitIsUnit("player", u) and UnitHealth(u) > 0  and UnitIsConnected(u) then
-				TargetUnit(u)
-				Zorlen_castSpellByName("Ritual of Summoning")
-				LazyPigMultibox_Annouce("lpm_slaveannouce", "Summoning - Group: "..GetUnitName("target").." - Shards: "..Zorlen_GiveContainerItemCountByName("Soul Shard"))
-				return
-			end
-			counter = counter + 1
-		end
-	end	
-	LazyPigMultibox_Annouce("lpm_slaveannouce", "Noone to Summon - Shards: "..Zorlen_GiveContainerItemCountByName("Soul Shard"))
-end
-
-function LazyPigMultibox_SmartSS()
-		if UnitAffectingCombat("player") or Zorlen_isEnemy("target") then
-			return
-		end	
-		
-		local ss_spell = nil
-		local ss_item = nil
-		
-		if Zorlen_IsSpellKnown("Create Soulstone (Major)") then
-			ss_spell = "Create Soulstone (Major)"
-			ss_item = "Major Soulstone"
-		elseif Zorlen_IsSpellKnown("Create Soulstone (Greater)") then
-			ss_spell = "Create Soulstone (Greater)"
-			ss_item = "Greater Soulstone"
-		elseif Zorlen_IsSpellKnown("Create Soulstone") then
-			ss_spell = "Create Soulstone"
-			ss_item = "Soulstone"
-		elseif Zorlen_IsSpellKnown("Create Soulstone (Lesser)") then
-			ss_spell = "Create Soulstone (Lesser)"
-			ss_item = "Lesser Soulstone"
-		elseif Zorlen_IsSpellKnown("Create Soulstone (Minor)") then
-			ss_spell = "Create Soulstone (Minor)"
-			ss_item = "Minor Soulstone"	
-		end
-		
-		if ss_spell then
-			if Zorlen_isCasting() or Zorlen_isChanneling() then 
-				return
-			end
-			
-			local InRaid = UnitInRaid("player")
-			local PLAYER = "player"
-			local group = nil
-			local NumMembers = nil
-			local counter = nil
-			local u = nil
-					
-			local primary_rez_class = nil
-			local master_class = nil
-				
-			if InRaid then
-				NumMembers = GetNumRaidMembers()
-				counter = 1
-				group = "raid"
-			else
-				NumMembers = GetNumPartyMembers()
-				counter = 0
-				group = "party"
-			end
-						
-			while counter <= NumMembers do
-				if counter == 0 then
-					u = PLAYER
-				else
-					u = group..""..counter
-				end
-				
-				if Zorlen_checkBuffByName("Soulstone Resurrection", u) then
-					LazyPigMultibox_Annouce("lpm_slaveannouce","SS Already Active - "..GetUnitName(u))
-					LazyPigMultibox_Message("SS Already Active - "..GetUnitName(u))
-					return
-				end
-				
-				if UnitExists(u) and not UnitIsDeadOrGhost(u) and not UnitIsUnit(u, "player") and UnitHealth(u) > 0 and UnitIsConnected(u) and (isPaladin(u) or isPriest(u) or isShaman(u)) then
-					if UnitIsPartyLeader(u) then
-						master_class = u
-						break
-							
-					elseif(isPaladin(u) or isPriest(u) or isShaman(u)) then
-						primary_rez_class = u
-					end
-				end
-				counter = counter + 1
-			end
-				
-			master_class = master_class or primary_rez_class
-			
-			if Zorlen_GiveContainerItemCountByName("Soul Shard") > 5 and not Zorlen_isMoving() then
-				LazyPigMultibox_Annouce("lpm_slaveannouce","SS - "..GetUnitName(master_class).." - Shards: "..Zorlen_GiveContainerItemCountByName("Soul Shard"))
-				LazyPigMultibox_Message("SS - "..GetUnitName(master_class).." - Shards: "..Zorlen_GiveContainerItemCountByName("Soul Shard"))			
-				
-				if Zorlen_GiveContainerItemCountByName(ss_item, true) == 0 then
-					Zorlen_castSpellByName(ss_spell)
-				else
-					TargetUnit(master_class)
-					Zorlen_useContainerItemByName(ss_item)
-				end
-			end
-		else
-			LazyPigMultibox_Annouce("lpm_slaveannouce","Unknown Spell - Create Soulstone")
-			LazyPigMultibox_Message("Unknown Spell - Create Soulstone")
-		end	
-	return
-end

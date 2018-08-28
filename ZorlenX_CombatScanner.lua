@@ -1,67 +1,81 @@
 COMBAT_SCANNER = {}
 
--- @TODO Need to implement range check
 -- @TODO Need to implement 
 
 function ZorlenX_resetCombatScanner()
-  COMBAT_SCANNER.lastScanDuration = 0
-  COMBAT_SCANNER.lastScanCount = 0
-  COMBAT_SCANNER.lastScanTime = GetTime()
-  COMBAT_SCANNER.activeLooseEnemyCount = 0
-  COMBAT_SCANNER.enemiesTargetingYouCount = 0
+  COMBAT_SCANNER.scanTime = 0
+  COMBAT_SCANNER.lastTarget = false
+  COMBAT_SCANNER.looseEnemies = 0
   COMBAT_SCANNER.castersWithAggroCount = 0
   COMBAT_SCANNER.myCCApplied = false
-  COMBAT_SCANNER.highestHealth = nil
-  COMBAT_SCANNER.lowestHealth = nil
+  COMBAT_SCANNER.highestHealth = false
+  COMBAT_SCANNER.lowestHealth = false
   COMBAT_SCANNER.isBossFight = false
   COMBAT_SCANNER.totemExists = false
-  COMBAT_SCANNER.targetAttackingMe = false
-  COMBAT_SCANNER.targetAttackingCloth = false
+  COMBAT_SCANNER.enemiesTargetingYou = 0
   COMBAT_SCANNER.ccAbleTargetExists = false
   COMBAT_SCANNER.ccsApplied = {}
+  return COMBAT_SCANNER
 end
 
+function ZorlenX_CurrentTargetFingerPrint()
+  if UnitExists("target") then
+    return UnitName("target") .. "/" .. UnitLevel("target") .. "/" .. UnitHealth("target")
+  end
+end
 
 -- /script local cs = ZorlenX_CombatScan() ZorlenX_Debug(cs)
 function ZorlenX_CombatScan()
-  if COMBAT_SCANNER.lastScanTime and (COMBAT_SCANNER.lastScanTime + 1) > GetTime() then
+
+  if ZorlenX_TimeLock("CombatScan",1) then
     return COMBAT_SCANNER
   end
-  if self == nil then
-    self = sheepSafe
-  end
+
   -- resetting values
   ZorlenX_resetCombatScanner()
+  if not UnitAffectingCombat("player") then
+    return COMBAT_SCANNER
+  end
 
   --defining some locals
   local activeLooseEnemies = {}
   local enemiesTargetingYou = {}
   local castersWithAggro = {}
-  local enemyesAggroingCasters= {}
-
+  local enemyesAggroingCasters = {}
+  local enemiesAoeRange = {}
+  local scanStart = GetTime()
 
   for cc_spellname,applied in pairs(sheepSafe.ccs) do
     COMBAT_SCANNER.ccsApplied[cc_spellname] = false
   end
 
-  for i = 1, 10 do
+  COMBAT_SCANNER.lastTarget = ZorlenX_CurrentTargetFingerPrint()
+
+  for i = 1, 12 do
     TargetNearestEnemy()
     if not UnitExists("target") then
       break
     end
+    local current_target_name = ZorlenX_CurrentTargetFingerPrint()
+
+    -- break iteration if we probably have orignial target...
+    if i > 8 and COMBAT_SCANNER.lastTarget == current_target_name then
+      break
+    end
+
     -- determines the CCed targets we have..
     local targetIsCrowdControlled = false
-    for cc_spellname,applied in pairs(sheepSafe.ccs) do
+    for cc_spellname, applied in pairs(sheepSafe.ccs) do
       if Zorlen_checkDebuff(cc_spellname,"target") then
         COMBAT_SCANNER.ccsApplied[cc_spellname] = true
         targetIsCrowdControlled	=	true
       end
     end
+
     if ZorlenX_IsTotem("target") then
       COMBAT_SCANNER.totemExists = true
     end
 
-    local current_target_name = UnitName("target") .. " - " .. UnitLevel("target")
     if Zorlen_isEnemyTargetingYou() then
       enemiesTargetingYou[current_target_name] = 1
     end
@@ -77,6 +91,10 @@ function ZorlenX_CombatScan()
     if Zorlen_isActiveEnemy("target") and UnitExists("targettarget") and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
       enemyesAggroingCasters[current_target_name] = true
       castersWithAggro[UnitName("targettarget")] = true
+    end
+
+    if Zorlen_isActiveEnemy("target") and CheckInteractDistance("target",2) then
+      enemiesAoeRange[current_target_name] = 1
     end
 
     if Zorlen_isActiveEnemy("target") and ZorlenX_mobIsBoss("target") then
@@ -96,12 +114,15 @@ function ZorlenX_CombatScan()
   end
 
   -- counting active loose enemies++
-  COMBAT_SCANNER.activeLooseEnemyCount = ZorlenX_tableLength(activeLooseEnemies)
-  COMBAT_SCANNER.enemiesTargetingYouCount = ZorlenX_tableLength(enemiesTargetingYou)
+  COMBAT_SCANNER.looseEnemies = ZorlenX_tableLength(activeLooseEnemies)
+  COMBAT_SCANNER.enemiesTargetingYou = ZorlenX_tableLength(enemiesTargetingYou)
   COMBAT_SCANNER.castersWithAggro = ZorlenX_tableKeys(castersWithAggro)
   COMBAT_SCANNER.castersWithAggroCount = ZorlenX_tableLength(castersWithAggro)
-  COMBAT_SCANNER.lastScanDuration = GetTime() - COMBAT_SCANNER.lastScanTime
-
+  COMBAT_SCANNER.enemiesAoeRange = ZorlenX_tableKeys(enemiesAoeRange) 
+  COMBAT_SCANNER.scanTime = round(GetTime() - scanStart, 4)
+  -- clean up ofc.
+  -- TargetLastTarget()
+  ZorlenX_UpdateCombatFrame()
   return COMBAT_SCANNER
 end
 
@@ -122,6 +143,22 @@ function targetLowestHP()
   end
 end
 
+function targetMainTarget()
+  LazyPigMultibox_AssistMaster()
+  if not Zorlen_isActiveEnemy("target") then
+    if ZorlenX_inRaidOrDungeon() and targetLowestHP() then
+      return true
+    elseif targetEnemyAttackingMe() then
+      return true
+    else
+      return false
+    end
+  else
+    -- LPM mastertarget is active... kill it!
+    return true
+  end
+end
+
 function targetHighestHP()
   if not COMBAT_SCANNER.highestHealth then
     return false
@@ -132,7 +169,7 @@ function targetHighestHP()
 end
 
 function targetEnemyAttackingMe()
-  if not (COMBAT_SCANNER.enemiesTargetingYouCount > 0) then
+  if not (COMBAT_SCANNER.enemiesTargetingYou > 0) then
     return false
   end
   for i = 1, 6 do
@@ -175,7 +212,6 @@ function ZorlenX_FindUntargetedTarget()
     self = sheepSafe
   end
   local myCCisApplied = ZorlenX_ccIsApplied(sheepSafe.ccicon)
-  local activeLooseEnemyCount = COMBAT_SCANNER.activeLooseEnemyCount
   local checkRaidAndPartyTargets = false
   if myCCisApplied then
     -- not targeting is done yet. 
@@ -183,7 +219,7 @@ function ZorlenX_FindUntargetedTarget()
     return false
   end
 
-  if activeLooseEnemyCount < 2 then
+  if COMBAT_SCANNER.looseEnemies < 2 then
     sheepSafe:p("Aborting: Too few loose enemies.");
     return false
   end
@@ -195,7 +231,6 @@ function ZorlenX_FindUntargetedTarget()
   for i = 1, 6 do
     TargetNearestEnemy()
     TargetName = UnitName("target")
-
     if not UnitCanAttack("player", "target") or not TargetName or not Zorlen_isActiveEnemy("target") then
       -- case where player was targeting nothing/friend, and no enemies in vicinity
       break
@@ -231,3 +266,56 @@ function ZorlenX_isUnitCCable(unit)
   end
 end 
 
+
+local zorlenx_frame_count = 1
+function zorlenx_unique_frame_name()
+  zorlenx_frame_count = zorlenx_frame_count + 1
+  return 'zorlenx_frame_' .. zorlenx_frame_count
+end
+
+-- /script ZorlenX_CreateCombatFrame()
+ZORLENX_COMBAT_TABLE = {}
+ZORLENX_COMBAT_TABLE.values = {}
+ZORLENX_COMBAT_TABLE.keys = {}
+function ZorlenX_CreateCombatFrame()
+  local localCombatScanner = ZorlenX_resetCombatScanner()
+  local frame = CreateFrame("Frame",nil,UIParent)
+  frame:SetFrameStrata("BACKGROUND")
+  frame:SetWidth(200) -- Set these to whatever height/width is needed 
+  frame:SetHeight(600) -- for your Texture
+  frame:SetPoint('RIGHT',-50,-500)
+  --local t = frame:CreateTexture(nil,"BACKGROUND")
+  --t:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Factions.blp")
+  --t:SetAllPoints(frame)
+  --frame.texture = t
+  local font = [[Fonts\ARIALN.TTF]]
+
+  local row_number = 0
+  local line_spacing = 15
+  for key, value in pairs (localCombatScanner) do
+    ZorlenX_Log(key)
+    local value_text = frame:CreateFontString(nil, zorlenx_unique_frame_name())
+    value_text:SetFont(font, 12)
+    value_text:SetText("-")
+    value_text:SetPoint('TOPRIGHT', 0, row_number * line_spacing)
+    ZORLENX_COMBAT_TABLE.values[key] = value_text
+    local key_text = frame:CreateFontString(nil, zorlenx_unique_frame_name())
+    key_text:SetFont(font, 12)
+    key_text:SetText(key)
+    key_text:SetPoint('TOPLEFT', 0 , row_number * line_spacing)
+    ZORLENX_COMBAT_TABLE.keys[key] = key_text
+    row_number = row_number + 1
+  end
+  frame:Show()
+  return frame
+end
+
+ZorlenX_CreateCombatFrame()
+
+function ZorlenX_UpdateCombatFrame()
+  for key, value in pairs (COMBAT_SCANNER) do
+    if key ~= "ccsApplied" and ZORLENX_COMBAT_TABLE.values[key] then
+      ZORLENX_COMBAT_TABLE.values[key]:SetText(to_string(value))
+    end
+  end
+end

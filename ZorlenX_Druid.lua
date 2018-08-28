@@ -1,12 +1,11 @@
 function ZorlenX_Druid(dps, dps_pet, heal, rez, buff)
 
-  local locked = Zorlen_isChanneling() or Zorlen_isCasting()
   local cat_form = isCatForm()
   local bear_form = isDireBearForm() or isBearForm()
   local caster_form = isCasterForm()
   local moonkin_form = isMoonkinForm()
 
-  if locked then
+  if Zorlen_isCastingOrChanneling() then
     return true
   end
 
@@ -66,12 +65,21 @@ end
 
 -- /script ZorlenX_AttackBear()
 function ZorlenX_AttackBear()
+  ZorlenX_CombatScan() --just for debugging while grinding.
+  if UnitExists("target") then
+    local result = CheckInteractDistance("target",2)
+    -- ZorlenX_Log(result)
+  end
   if isDireBearForm() or isBearForm() then
     if not Zorlen_isEnemyTargetingYou() and Zorlen_checkCooldownByName("Growl") and not Zorlen_isEnemyPlayer("target") and UnitExists("targettarget") and Zorlen_castSpellByName("Growl") then 
       return true	
     elseif Zorlen_castSpellByName("Maul") then
       return true	
     end
+  elseif Zorlen_HealthPercent("player") < 90 and Zorlen_ManaPercent("player") > 50  and castMaxRejuvenation(nil, "player") then
+    return true
+  elseif not UnitAffectingCombat("target") and Zorlen_ManaPercent("player") > 50 and castMoonfire() then
+    return true
   else
     -- ensures bear form
     return castBearForm()

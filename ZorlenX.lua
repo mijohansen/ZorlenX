@@ -19,14 +19,14 @@ end
 function ZorlenX_OnEvent(event)
   if(event == "CHAT_MSG_ADDON" and arg4 ~= GetUnitName("player")) then
     -- routing everything through the LPM announce function
-    ZorlenX_Log("Message Received: " .. to_string({arg1, arg2, arg4}))
-    ZorlenX_MessageReceiver(arg1, arg2, arg4);
-    LazyPigMultibox_Annouce(arg1, arg2, arg4);
+    
+    ZorlenX_MessageReceiver(arg1, arg2, arg4)
+    LazyPigMultibox_Annouce(arg1, arg2, arg4)
   end
 
   if(event == "ADDON_LOADED") then
     --just ensure that macros are created.
-    ZorlenX_Log("Updating macros")
+    -- ZorlenX_Log("Updating macros")
   end
   sheepSafe:OnEvent(event)
 end
@@ -35,6 +35,7 @@ end
 function ZorlenX_MessageReceiver(mode, message, sender)
   local sender_name = sender or "Player"
   if mode == "zorlenx_request_trade" then
+    ZorlenX_Log("Message Received from " .. arg4 .. ": " .. arg1 .. " - " .. arg2)
     ZorlenX_RequestSmartTrade(message,sender_name)
   end 
 end
@@ -60,8 +61,17 @@ function ZorlenX_DpsSingleTarget()
   return ZorlenX_UseClassScript()
 end
 
+function ZorlenX_isOutside()
+  return not ZorlenX_inRaidOrDungeon()
+end
+
+function ZorlenX_inRaidOrDungeon()
+  return (LazyPig_Raid() or LazyPig_Dungeon())
+end
+
+
 -- /script ZorlenX_UseClassScript()
-function ZorlenX_UseClassScript(multitarget)
+function ZorlenX_UseClassScript(multitarget, spellcaster)
   local time = GetTime()
   if LPM_TIMER.SCRIPT_USE < time then	
     LPM_TIMER.SCRIPT_USE = time + 0.5
@@ -74,7 +84,7 @@ function ZorlenX_UseClassScript(multitarget)
       return
     end
 
-    if playerIsSlave and not Zorlen_isCastingOrChanneling() then
+    if not Zorlen_isCastingOrChanneling() then
       -- added support for Decursive, just running the script when not Channeling or casting
       if Dcr_Clean(false,false) then
         ZorlenX_Log("Tried to decursive.")
@@ -83,8 +93,7 @@ function ZorlenX_UseClassScript(multitarget)
       -- performing combat scan
       local COMBAT_SCANNER = ZorlenX_CombatScan()
       -- added support for SheepSafe, just running the script when not Channeling or casting
-      if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.activeLooseEnemyCount > 1) and ZorlenX_SheepSafeUntargeted() then
-        -- ZorlenX_Debug(COMBAT_SCANNER)
+      if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.looseEnemies > 1) and ZorlenX_SheepSafeUntargeted() then
         ZorlenX_Log("Tried to sheepsafe.")
         return 
       end
@@ -92,29 +101,30 @@ function ZorlenX_UseClassScript(multitarget)
 
       --  ingen targeting foregår før class scripts
       if dps or dps_pet or heal  then
-        --doing some default selection when
-        if COMBAT_SCANNER.activeLooseEnemyCount == 1 then
-        end
-        LazyPigMultibox_AssistMaster()
+        --doing some default targeting probably good to do that before running class scripts?
+        --if COMBAT_SCANNER.looseEnemies == 1 then
+        --end
+        --LazyPigMultibox_AssistMaster()
         dps = dps and Zorlen_isEnemy("target") and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
+        ZorlenX_Log("Running class script.")
         if isPaladin("player") then
-          ZorlenX_Paladin(dps, dps_pet, heal);
+          ZorlenX_Paladin(dps, dps_pet, heal, multitarget);
         elseif isShaman("player") then
-          --ZorlenX_Shaman(dps, dps_pet, heal);
+          --ZorlenX_Shaman(dps, dps_pet, heal, multitarget);
         elseif isDruid("player") then
-          ZorlenX_Druid(dps, dps_pet, heal);	
+          ZorlenX_Druid(dps, dps_pet, heal, multitarget);	
         elseif isPriest("player") then
-          ZorlenX_Priest(dps, dps_pet, heal);
+          ZorlenX_Priest(dps, dps_pet, heal, multitarget);
         elseif isWarlock("player") then
-          ZorlenX_Warlock(dps, dps_pet, heal);
+          ZorlenX_Warlock(dps, dps_pet, heal, multitarget);
         elseif isMage("player") then
-          ZorlenX_Mage(dps, dps_pet, heal);
+          ZorlenX_Mage(dps, dps_pet, heal, multitarget);
         elseif isHunter("player") then
-          --ZorlenX_Hunter(dps, dps_pet, heal);
+          --ZorlenX_Hunter(dps, dps_pet, heal, multitarget);
         elseif isRogue("player") then
-          --ZorlenX_Rogue(dps, dps_pet, heal);
+          --ZorlenX_Rogue(dps, dps_pet, heal, multitarget);
         elseif isWarrior("player") then
-          --ZorlenX_Warrior(dps, dps_pet, heal);
+          --ZorlenX_Warrior(dps, dps_pet, heal, multitarget);
         end
         return true
       end	
@@ -122,9 +132,10 @@ function ZorlenX_UseClassScript(multitarget)
 
     -- spesific function for when casting evaluating target etc.
     -- We will not change target unless player is idle
-    if playerIsSlave and Zorlen_isCasting() and UnitExists("target") and Zorlen_isEnemy("target") then
+    if Zorlen_isCasting() and UnitExists("target") and Zorlen_isEnemy("target") then
       if ZorlenX_IsCrowdControlled() or UnitIsDeadOrGhost("target") then
-        SpellStopCasting();
+        SpellStopCasting()
+        ZorlenX_Log("Tried to stop spell due to bad target.")
       end
     end
 
@@ -144,7 +155,7 @@ end
 
 -- 
 function FollowLeader()
-  if isGrouped() and not Zorlen_isCastingOrChanneling() and  then
+  if isGrouped() and not Zorlen_isCastingOrChanneling()  then
     local leader = LazyPigMultibox_ReturnLeaderUnit()
     FollowUnit(leader)
   end
@@ -171,7 +182,7 @@ function ZorlenX_OutOfCombat()
     return true
   end
 
-  if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
+  if Zorlen_isCastingOrChanneling() or UnitAffectingCombat("player") then
     return
   end
   if LPMULTIBOX.SCRIPT_REZ and not Zorlen_isMoving() and LazyPigMultibox_Rez() then
@@ -300,7 +311,8 @@ end
 -- Zorlen_MakeMacro(LOCALIZATION_ZORLEN.EatMacroName, "/zorlen eat", 0, "Spell_Misc_Food", nil, 1, show)
 -- /script ZorlenX_createMacros()
 function ZorlenX_createMacros()
-  Zorlen_MakeMacro("1DPS", "/script ZorlenX_UseClassScript()", 0, "Ability_Druid_Maul", nil, 1,1)
+  local res = Zorlen_MakeMacro("1DPS", "/script ZorlenX_UseClassScript()", 0, "Ability_Druid_Maul", nil, 1,1)
+  ZorlenX_Debug(res)
   Zorlen_MakeMacro("2DPS", "/script ZorlenX_UseClassScript()", 0, "Ability_Druid_Bash", nil, 1,1)
   Zorlen_MakeMacro("3AOE", "/script ZorlenX_UseClassScript()" , 0, "Ability_Whirlwind", nil, 1,1)
   Zorlen_MakeMacro("4OUT", "/script ZorlenX_OutOfCombat()"   , 0, "Spell_Misc_Drink", nil, 1,1)
@@ -319,7 +331,22 @@ function ZorlenX_Debug(value)
 end
 
 function ZorlenX_Log(msg,value)
-  ChatFrame3:AddMessage(msg,to_string(value))
+  local playerTargetName = UnitName("playertarget")
+  if not playerTargetName then
+    playerTargetName = "<Unknown>"
+  end
+  ChatFrame3:AddMessage("[" .. playerTargetName .. "]" .. msg,to_string(value))
+end
+
+ZORLENX_TIMELOCKS = {}
+-- returns if something is timelocked. If not creates a new lock.
+function ZorlenX_TimeLock(name,seconds)
+  if ZORLENX_TIMELOCKS[name] and (ZORLENX_TIMELOCKS[name] + seconds) > GetTime() then
+    return true
+  else
+    ZORLENX_TIMELOCKS[name] = GetTime()
+    return false
+  end
 end
 
 function table_print (tt, indent, done)

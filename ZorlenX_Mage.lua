@@ -1,9 +1,7 @@
 -- at this point lacks target.
 function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
 
-  local locked = Zorlen_isChanneling() or Zorlen_isCasting()
-  
-  if locked then
+  if Zorlen_isCastingOrChanneling() then
     return true
   end
 
@@ -20,12 +18,11 @@ function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
     if Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) then
       return true
     else
-      -- targeting function is run, we go back to assist on Master target.
-      LazyPigMultibox_AssistMaster()
+      ZorlenX_Log("Failed to deal with enemy targeting casters.")
     end
   end
-  
-  if ZorlenX_MageDPS() then
+  -- we need to do some smart targeting here. For now. AssistMasterOrFirst and best.
+  if targetMainTarget() and ZorlenX_MageDPS() then
     return true
   end
 end
@@ -160,7 +157,7 @@ function ZorlenX_MageConjure()
   if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
     return false
   end
-  if Zorlen_ManaPercent("player") < 10 then
+  if Zorlen_ManaPercent("player") < 20 then
     return false
   end
   if isMage("player") and ZorlenX_MageWaterCount() < 60 and Zorlen_castSpellByName("Conjure Water") then 
