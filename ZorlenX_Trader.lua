@@ -3,7 +3,7 @@ ZORLENX_TRADER = {}
 
 function ZorlenX_RequestSmartTrade(message,sender_name)
 
-  if ZORLENX_TRADER.lastServed and ZORLENX_TRADER.lastServed + 2 > GetTime() then
+  if ZorlenX_TimeLock("RequestSmartTrade", 2) then
     return false
   end
 
@@ -12,13 +12,10 @@ function ZorlenX_RequestSmartTrade(message,sender_name)
   end
 
   if message == "WATER" and ZorlenX_ServeDrinks(sender_name) then
-    ZORLENX_TRADER.lastServed = GetTime()
     return true
   elseif message == "HEALTHSTONE" and ZorlenX_ServeHealthstone(sender_name) then
-    ZORLENX_TRADER.lastServed = GetTime()
     return true
   elseif message == "POTIONS" and ZorlenX_ServePortions(sender_name) then
-    ZORLENX_TRADER.lastServed = GetTime()
     return true
   end
 end

@@ -46,8 +46,8 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
     return true
   end
   
-  if targetEnemyAggroingCasters()  then
-    if CheckInteractDistance("target", 3) and not Zorlen_isDieingEnemy("target") and (castDeathCoil() or castFear()) then
+  if targetEnemyAttackingCasters()  then
+    if COMBAT_SCANNER.looseEnemies > 1 and CheckInteractDistance("target", 2) and not Zorlen_isDieingEnemy("target") and (castDeathCoil() or castFear()) then
       return true
     else
       -- targeting function is run, we go back to assist on Master target.

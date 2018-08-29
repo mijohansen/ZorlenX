@@ -24,7 +24,7 @@ function ZorlenX_Paladin(dps, dps_pet, heal)
     TargetUnit("playertarget") --trying to fix overheal issue by reselecting the player target
 	end
   
-  if targetEnemyAggroingCasters() and CheckInteractDistance("target", 3) and not Zorlen_isDieingEnemy("target") and castHammerOfJustice() then
+  if targetEnemyAttackingCasters() and CheckInteractDistance("target", 3) and not Zorlen_isDieingEnemy("target") and castHammerOfJustice() then
     return true
   end
   

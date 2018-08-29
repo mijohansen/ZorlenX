@@ -14,8 +14,9 @@ function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
     return true
   end
   
-  if targetEnemyAggroingCasters() then
-    if Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) then
+  if targetEnemyAttackingCasters() then
+    --hurling a rank 1 frostbolt.
+    if not Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) then
       return true
     else
       ZorlenX_Log("Failed to deal with enemy targeting casters.")
@@ -49,7 +50,6 @@ function ZorlenX_MageSmartScorch()
   local scorch_stack = Zorlen_GetDebuffStack("Spell_Fire_SoulBurn", "target")
   local target_hp = ZorlenX_GetTargetCurHP()
   local player_hp = UnitHealthMax("player")
-  --Zorlen_debug("scorch_stack: " .. scorch_stack .. ", target_hp: " .. target_hp .. ", player_hp: " .. player_hp);
   if target_hp > 2*player_hp and scorch_stack < 5 and cast_ManaEfficient_Scorch() then
     return true
   end
@@ -154,7 +154,7 @@ end
 
 
 function ZorlenX_MageConjure()
-  if Zorlen_isChanneling() or Zorlen_isCasting() or UnitAffectingCombat("player") then
+  if Zorlen_isCastingOrChanneling() or UnitAffectingCombat("player") then
     return false
   end
   if Zorlen_ManaPercent("player") < 20 then

@@ -5,6 +5,7 @@
 * TopMeOff functionalitey into the addon: https://github.com/Bergador/TopMeOff/blob/master/TopMeOff.lua
 * Autotrade from Master to Slaves. Slaves will allways have full stacks of stuff.
 * 
+Berserking should pop at some point. 
 
 ]]
 
@@ -19,7 +20,7 @@ end
 function ZorlenX_OnEvent(event)
   if(event == "CHAT_MSG_ADDON" and arg4 ~= GetUnitName("player")) then
     -- routing everything through the LPM announce function
-    
+
     ZorlenX_MessageReceiver(arg1, arg2, arg4)
     LazyPigMultibox_Annouce(arg1, arg2, arg4)
   end
@@ -162,13 +163,12 @@ function FollowLeader()
 end
 
 
-local ZorlenX_OutOfCombatLastRun
+
 function ZorlenX_OutOfCombat()
   -- Doing some spam avoide here.
-  if ZorlenX_OutOfCombatLastRun and (ZorlenX_OutOfCombatLastRun + 1) > GetTime() then
+  if ZorlenX_TimeLock("OutOfCombat", 1) then
     return true
   end
-  ZorlenX_OutOfCombatLastRun = GetTime()
 
   if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
     SitOrStand()
@@ -274,24 +274,6 @@ function ZorlenX_IsTotem(unit)
 end
 
 
-function ZorlenX_tableLength(T)
-  local count = 0
-  for _ in pairs(T) do 
-    count = count + 1 
-  end
-  return count
-end
-
-function ZorlenX_tableKeys(T)
-  local count = 0
-  local keyset={}
-  for k,v in pairs(T) do 
-    count = count + 1 
-    keyset[count]=k
-  end
-  return keyset
-end
-
 -- To solve the very strange behaviour on Elysium 
 function ZorlenX_mobIsBoss(unit)
   local bosses = {}
@@ -307,6 +289,7 @@ function ZorlenX_mobIsBoss(unit)
   end
   return false
 end
+
 -- Zorlen_MakeMacro(name, macro, percharacter, macroicontecture, iconindex, replace, show, nocreate, replacemacroindex, replacemacroname)
 -- Zorlen_MakeMacro(LOCALIZATION_ZORLEN.EatMacroName, "/zorlen eat", 0, "Spell_Misc_Food", nil, 1, show)
 -- /script ZorlenX_createMacros()
@@ -321,8 +304,6 @@ function ZorlenX_createMacros()
   Zorlen_MakeMacro("LEADER", "/console LazyPigMultibox_MakeMeLeader()", 0, "Hunter_Sniper", nil, 1, 1)
 
 end
-
-
 
 ----------------- debug utilities -------
 function ZorlenX_Debug(value)
@@ -349,7 +330,42 @@ function ZorlenX_TimeLock(name,seconds)
   end
 end
 
-function table_print (tt, indent, done)
+function round(input, places)
+  if not places then places = 0 end
+  if type(input) == "number" and type(places) == "number" then
+    local pow = 1
+    for i = 1, places do pow = pow * 10 end
+    return math.floor(input * pow + 0.5) / pow
+  end
+end
+
+function table_sum(t)
+    local sum = 0
+    for k,v in pairs(t) do
+        sum = sum + v
+    end
+    return sum
+end
+
+function table_length(T)
+  local count = 0
+  for _ in pairs(T) do 
+    count = count + 1 
+  end
+  return count
+end
+
+function table_keys(T)
+  local count = 0
+  local keyset={}
+  for k,v in pairs(T) do 
+    count = count + 1 
+    keyset[count]=k
+  end
+  return keyset
+end
+
+function table_print(tt, indent, done)
   done = done or {}
   indent = indent or 0
   if type(tt) == "table" then
