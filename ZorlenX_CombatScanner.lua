@@ -28,7 +28,7 @@ end
 
 -- /script local cs = ZorlenX_CombatScan() ZorlenX_Debug(cs)
 function ZorlenX_CombatScan()
-  
+
   if ZorlenX_TimeLock("CombatScan",1) then
     return COMBAT_SCANNER
   end
@@ -151,6 +151,16 @@ function targetLowestHP()
   end
 end
 
+-- will target the first target that have a friendly target as target
+function targetFallbackTarget()
+  for i = 1, 6 do
+    TargetNearestEnemy()
+    if UnitIsFriend("player","targettarget") then
+      return true
+    end
+  end
+end
+
 function targetMainTarget()
   LazyPigMultibox_AssistMaster()
   if not Zorlen_isActiveEnemy("target") then
@@ -158,7 +168,7 @@ function targetMainTarget()
       return true
     elseif targetEnemyAttackingMe() then
       return true
-    elseif targetLowestHP() then
+    elseif targetFallbackTarget() then
       return true
     else
       ZorlenX_Log("Couldnt aquire a target. :-/")

@@ -173,34 +173,49 @@ function ZorlenX_OutOfCombat()
   if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
     SitOrStand()
   end
-
-  if ZorlenX_OrderDrinks() then
-    return
-  end
-
+  
   if ZorlenX_DruidEnsureCasterForm() then
     return true
   end
+  
+  -- casting doesnt affect trade. just trade!
+  -- need to toggle so that concurrency never happens.
+  if ZorlenX_TimeLock("OutOfCombatToggler", 1) then
+    ZorlenX_OrderDrinks()
+  else
+    ZorlenX_OrderHealthstone()
+  end
+  
 
-  if Zorlen_isCastingOrChanneling() or UnitAffectingCombat("player") then
+  if Zorlen_isCastingOrChanneling() or Zorlen_inCombat() then
     return
   end
+  
+    
+
+  
   if LPMULTIBOX.SCRIPT_REZ and not Zorlen_isMoving() and LazyPigMultibox_Rez() then
     return 
   end
-
-  if not Zorlen_isMoving() and isWarlock("player") and LazyPigMultibox_SmartSS() then
-    return
-  end
-
-  if not Zorlen_isMoving() and isMage("player") and ZorlenX_MageConjure() then
-    return
-  end
-
+  
   if LPMULTIBOX.SCRIPT_BUFF and LazyPigMultibox_UnitBuff() then
     ZorlenX_Log("Buffing complete", LPMULTIBOX)
     return
   end
+  
+  if isWarlock("player")  and not Zorlen_isMoving() and LazyPigMultibox_SmartSS() then
+    return
+  end
+  
+  if isWarlock("player")  and not Zorlen_isMoving() and ZorlenX_CreateHealthStone() then
+    return
+  end
+  
+  if isMage("player") and not Zorlen_isMoving() and ZorlenX_MageConjure() then
+    return
+  end
+
+
 
   if Zorlen_isMoving() and Zorlen_ManaPercent("player") > 90 then 
     -- throw som hots around.

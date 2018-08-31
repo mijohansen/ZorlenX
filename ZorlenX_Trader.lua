@@ -31,6 +31,9 @@ function ZorlenX_DropItemOnPlayerByName(player_name)
 end
 
 function ZorlenX_OrderDrinks()
+  --if TradeFrame:IsVisible() then
+  --  return false
+  --end
   if usesMana(player) and not isMage("player") and not Zorlen_isMoving() and isGrouped() and Zorlen_notInCombat() then
     Zorlen_UpdateDrinkItemInfo()
     local bag, slot, fullcount, level = Zorlen_GetDrinkSlotNumber()
@@ -39,7 +42,6 @@ function ZorlenX_OrderDrinks()
     end
     if fullcount < 5 then
       ZorlenX_Log("Request water, only " .. fullcount .. " drinks left.")
-      SendAddonMessage("zorlenx_request_trade", "WATER", "RAID")
       return LazyPigMultibox_Annouce("zorlenx_request_trade", "WATER")
     end
   end
@@ -56,13 +58,31 @@ function ZorlenX_ServeDrinks(player_name)
   return false
 end
 
+function ZorlenX_OrderHealthstone()
+  if isWarlock("player") then
+    return false
+  end
+
+  if Zorlen_isMoving() or not isGrouped() then
+    return false
+  end
+
+  if healthstoneExists() then
+    return false
+  end
+  ZorlenX_Log("Request healthstone mofos!")
+  return LazyPigMultibox_Annouce("zorlenx_request_trade", "HEALTHSTONE")
+
+end
+
 function ZorlenX_ServeHealthstone(player_name)
-  --if isWarlock("player") and ZorlenX_MageWaterCount() > 15 then
-  --  local water_name = ZorlenX_MageWaterName()
-  --  ZorlenX_PickupContainerItemByName(water_name)
-  --  ZorlenX_DropItemOnPlayerByName(player_name)
-  --  return true
-  --end
+  local healthstoneName = healthstoneExists()
+  if isWarlock("player") and healthstoneName then
+    local water_name = ZorlenX_MageWaterName()
+    ZorlenX_PickupContainerItemByName(healthstoneName)
+    ZorlenX_DropItemOnPlayerByName(player_name)
+    return true
+  end
   return false
 end
 
