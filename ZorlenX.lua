@@ -163,7 +163,7 @@ function FollowLeader()
 end
 
 
-
+-- /script ZorlenX_OutOfCombat()
 function ZorlenX_OutOfCombat()
   -- Doing some spam avoide here.
   if ZorlenX_TimeLock("OutOfCombat", 1) then
@@ -175,51 +175,55 @@ function ZorlenX_OutOfCombat()
   end
   
   if ZorlenX_DruidEnsureCasterForm() then
+    ZorlenX_Log("Ensuring Caster Form for druid", LPMULTIBOX)
     return true
   end
   
   -- casting doesnt affect trade. just trade!
   -- need to toggle so that concurrency never happens.
-  if ZorlenX_TimeLock("OutOfCombatToggler", 1) then
-    ZorlenX_OrderDrinks()
-  else
-    ZorlenX_OrderHealthstone()
+  if ZorlenX_Toggle("OutOfCombatToggler") and ZorlenX_OrderDrinks() then
+    ZorlenX_Log("Ordering Drinks")
+  elseif ZorlenX_OrderHealthstone() then
+    ZorlenX_Log("Ordering Healthstone")
   end
   
 
   if Zorlen_isCastingOrChanneling() or Zorlen_inCombat() then
+    ZorlenX_Log("In Combat og already casting skipping.")
     return
   end
   
-    
-
   
   if LPMULTIBOX.SCRIPT_REZ and not Zorlen_isMoving() and LazyPigMultibox_Rez() then
+    ZorlenX_Log("Rezzing")
     return 
   end
   
   if LPMULTIBOX.SCRIPT_BUFF and LazyPigMultibox_UnitBuff() then
-    ZorlenX_Log("Buffing complete", LPMULTIBOX)
+    ZorlenX_Log("Buffing")
     return
   end
   
   if isWarlock("player")  and not Zorlen_isMoving() and LazyPigMultibox_SmartSS() then
+    ZorlenX_Log("Creating Soulstone")
     return
   end
   
   if isWarlock("player")  and not Zorlen_isMoving() and ZorlenX_CreateHealthStone() then
+    ZorlenX_Log("Creating Healthstone")
     return
   end
   
   if isMage("player") and not Zorlen_isMoving() and ZorlenX_MageConjure() then
+    ZorlenX_Log("Conjuring water")
     return
   end
 
 
 
-  if Zorlen_isMoving() and Zorlen_ManaPercent("player") > 90 then 
+  --if Zorlen_isMoving() and Zorlen_ManaPercent("player") > 90 then 
     -- throw som hots around.
-  end
+  --end
   if Zorlen_Drink() then
     return
   end
@@ -289,6 +293,7 @@ function ZorlenX_IsTotem(unit)
 end
 
 
+
 -- To solve the very strange behaviour on Elysium 
 function ZorlenX_mobIsBoss(unit)
   local bosses = {}
@@ -344,6 +349,16 @@ function ZorlenX_TimeLock(name,seconds)
     return false
   end
 end
+ZORLENX_TOGGLES = {}
+function ZorlenX_Toggle(name)
+  if ZORLENX_TOGGLES[name] then
+    ZORLENX_TOGGLES[name] = false
+    return true
+  else
+    ZORLENX_TOGGLES[name] = true
+    return false
+  end
+end 
 
 function round(input, places)
   if not places then places = 0 end
