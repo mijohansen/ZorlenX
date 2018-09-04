@@ -1,8 +1,8 @@
 ## Interface: 11200
 ## Title: ZorlenX
-## Version: 0.01
+## Version: 0.02
 ## Notes: Multiboxing Tool
-## Author: Wenlock
+## Author: mijohansen
 ## SavedVariablesPerCharacter: ZORLENX
 ## Dependencies: _LazyPig, _LazyPigMultibox, Zorlen, QuickHeal, SmartBuff, MobInfo2, Decursive
 

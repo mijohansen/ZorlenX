@@ -4,6 +4,7 @@ COMBAT_SCANNER = {}
 
 function ZorlenX_resetCombatScanner()
   COMBAT_SCANNER.scanTime = 0
+  COMBAT_SCANNER.scanIterations = 0
   COMBAT_SCANNER.lastTarget = false
   COMBAT_SCANNER.looseEnemies = 0
   COMBAT_SCANNER.activeEnemies = 0
@@ -15,9 +16,16 @@ function ZorlenX_resetCombatScanner()
   COMBAT_SCANNER.isBossFight = false
   COMBAT_SCANNER.totemExists = false
   COMBAT_SCANNER.enemiesAggroPlayer = 0
+  COMBAT_SCANNER.enemiesInAoeRange = 0
   COMBAT_SCANNER.ccAbleTargetExists = false
   COMBAT_SCANNER.ccsApplied = {}
   return COMBAT_SCANNER
+end
+
+function ZorlenX_CurrentTargetName()
+  if UnitExists("target") then
+    return UnitName("target") .. "/" .. UnitLevel("target")
+  end
 end
 
 function ZorlenX_CurrentTargetFingerPrint()
@@ -44,34 +52,52 @@ function ZorlenX_CombatScan()
   local enemiesAggroPlayer = {}
   local castersWithAggro = {}
   local enemyesAggroingCasters = {}
-  local enemiesAoeRange = {}
+  local enemiesInAoeRange = {}
   local scanStart = GetTime()
   local activeEnemiesHp = {}
-
-  for cc_spellname,applied in pairs(sheepSafe.ccs) do
-    COMBAT_SCANNER.ccsApplied[cc_spellname] = false
+  local enemyScanRounds = {}
+  
+  -- creating CC-targets
+  COMBAT_SCANNER.ccsApplied[sheepSafe.ccicon] = false
+  if isWarlock("player") then
+    COMBAT_SCANNER.ccsApplied[LOCALIZATION_ZORLEN.Fear] = false
   end
-
+  -- setting what target we had before scan.
   COMBAT_SCANNER.lastTarget = ZorlenX_CurrentTargetFingerPrint()
 
-  for i = 1, 12 do
+  for i = 1, 10 do
     TargetNearestEnemy()
     if not UnitExists("target") then
       break
     end
-    local current_target_name = ZorlenX_CurrentTargetFingerPrint()
-
+    COMBAT_SCANNER.scanIterations = i 
+    local currentTargetFingerprint = ZorlenX_CurrentTargetFingerPrint()
+    local targetIsCrowdControlled = false
+    local targetIsActiveEnemy = Zorlen_isActiveEnemy("target")
+    local currentTargetHealth = UnitHealth("target")
+    local currentTargetHealthAbs = ZorlenX_GetTargetCurHP()
+    if not enemyScanRounds[currentTargetFingerprint] then
+      enemyScanRounds[currentTargetFingerprint] = 0
+    end
     -- break iteration if we probably have orignial target...
-    if i > 8 and COMBAT_SCANNER.lastTarget == current_target_name then
+    if i > 5 and COMBAT_SCANNER.lastTarget == currentTargetFingerprint then
       break
     end
-
+    
+    -- break iteration if we have the original target and we are seeing it for the second time
+    if enemyScanRounds[currentTargetFingerprint] == 2 and (COMBAT_SCANNER.lastTarget == currentTargetFingerprint or not COMBAT_SCANNER.lastTarget)  then
+      break
+    end
     -- determines the CCed targets we have..
-    local targetIsCrowdControlled = false
-    for cc_spellname, applied in pairs(sheepSafe.ccs) do
-      if Zorlen_checkDebuff(cc_spellname,"target") then
-        COMBAT_SCANNER.ccsApplied[cc_spellname] = true
-        targetIsCrowdControlled	=	true
+    -- doing it just once pr scan pr target.
+    if not activeEnemiesHp[currentTargetFingerprint] then
+      targetIsCrowdControlled = Zorlen_isBreakOnDamageCC("target")
+      if targetIsCrowdControlled then
+        for ccSpellname, applied in pairs(COMBAT_SCANNER.ccsApplied) do
+          if Zorlen_checkDebuff(ccSpellname, "target" ) then
+            COMBAT_SCANNER.ccsApplied[ccSpellname] = true
+          end
+        end
       end
     end
 
@@ -80,62 +106,73 @@ function ZorlenX_CombatScan()
     end
 
     if Zorlen_isEnemyTargetingYou() then
-      enemiesAggroPlayer[current_target_name] = 1
+      enemiesAggroPlayer[currentTargetFingerprint] = 1
     end
 
-    if Zorlen_isActiveEnemy("target") and not targetIsCrowdControlled then
-      activeLooseEnemies[current_target_name] = 1
-      if ZorlenX_isUnitCCable("target") then
-        ZorlenX_Log(current_target_name .. " is ccAble.")
+    if targetIsActiveEnemy and not targetIsCrowdControlled then
+      if not activeLooseEnemies[currentTargetFingerprint] and ZorlenX_isUnitCCable("target") then
+        ZorlenX_Log("Target is ccAble.")
         COMBAT_SCANNER.ccAbleTargetExists = true
+        COMBAT_SCANNER.ccAbleTargetName = ZorlenX_CurrentTargetName()
       end
+      activeLooseEnemies[currentTargetFingerprint] = 1
     end
 
-    if Zorlen_isActiveEnemy("target") and UnitExists("targettarget") and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
-      enemyesAggroingCasters[current_target_name] = true
+    if targetIsActiveEnemy and UnitExists("targettarget") and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
+      enemyesAggroingCasters[currentTargetFingerprint] = true
       castersWithAggro[UnitName("targettarget")] = true
+      COMBAT_SCANNER.enemyAggroingCasterName = ZorlenX_CurrentTargetName()
     end
 
-    if Zorlen_isActiveEnemy("target") and CheckInteractDistance("target",2) then
-      enemiesAoeRange[current_target_name] = 1
+    if targetIsActiveEnemy and CheckInteractDistance("target",2) then
+      enemiesInAoeRange[currentTargetFingerprint] = 1
     end
 
-    if Zorlen_isActiveEnemy("target") and ZorlenX_mobIsBoss("target") then
+    if targetIsActiveEnemy and ZorlenX_mobIsBoss("target") then
       COMBAT_SCANNER.isBossFight = true
     end
 
-    local TargetHealth = UnitHealth("target")
-    if Zorlen_isActiveEnemy("target") then
-      activeEnemiesHp[current_target_name] = TargetHealth
-    end
-
     -- health targeting
-    if Zorlen_isActiveEnemy("target") and not targetIsCrowdControlled and TargetHealth then
-      if not COMBAT_SCANNER.highestHealth or TargetHealth > COMBAT_SCANNER.highestHealth then
-        COMBAT_SCANNER.highestHealth = TargetHealth
+    if targetIsActiveEnemy and not targetIsCrowdControlled and currentTargetHealthAbs then
+      if not COMBAT_SCANNER.highestHealth or currentTargetHealthAbs > COMBAT_SCANNER.highestHealth then
+        COMBAT_SCANNER.highestHealth = currentTargetHealthAbs
+        COMBAT_SCANNER.highestHealthName = ZorlenX_CurrentTargetName()
       end
-      if not COMBAT_SCANNER.lowestHealth or TargetHealth < COMBAT_SCANNER.lowestHealth then
-        COMBAT_SCANNER.lowestHealth = TargetHealth
+      if not COMBAT_SCANNER.lowestHealth or currentTargetHealthAbs < COMBAT_SCANNER.lowestHealth then
+        COMBAT_SCANNER.lowestHealth = currentTargetHealthAbs
+        COMBAT_SCANNER.lowestHealthName = ZorlenX_CurrentTargetName()
       end
     end
-  end
 
+    if targetIsActiveEnemy and not activeEnemiesHp[currentTargetFingerprint] then
+      activeEnemiesHp[currentTargetFingerprint] = currentTargetHealthAbs
+    end
+    
+    -- just counting how many times we a have scanned this target
+    enemyScanRounds[currentTargetFingerprint] = enemyScanRounds[currentTargetFingerprint] + 1
+  end
   -- counting active loose enemies++
   COMBAT_SCANNER.looseEnemies          = table_length(activeLooseEnemies)
   COMBAT_SCANNER.enemiesAggroPlayer    = table_length(enemiesAggroPlayer)
   COMBAT_SCANNER.castersWithAggro      = table_keys(castersWithAggro)
   COMBAT_SCANNER.castersWithAggroCount = table_length(castersWithAggro)
-  COMBAT_SCANNER.enemiesAoeRange       = table_length(enemiesAoeRange) 
+  COMBAT_SCANNER.enemiesInAoeRange     = table_length(enemiesInAoeRange) 
   COMBAT_SCANNER.scanTime              = round(GetTime() - scanStart, 4)
   COMBAT_SCANNER.activeEnemies         = table_length(activeEnemiesHp) 
   COMBAT_SCANNER.totalEnemyHP          = table_sum(activeEnemiesHp) 
-
+  COMBAT_SCANNER.myCCApplied           = ZorlenX_myCcIsApplied()
+  
   ZorlenX_UpdateCombatFrame()
+  
   return COMBAT_SCANNER
 end
 
 function ZorlenX_ccIsApplied(cc_spellname)
   return COMBAT_SCANNER.ccsApplied[cc_spellname]
+end
+
+function ZorlenX_myCcIsApplied()
+  return ZorlenX_ccIsApplied(sheepSafe.ccicon)
 end
 
 function targetLowestHP()
@@ -144,10 +181,18 @@ function targetLowestHP()
   end
   for i = 1, 6 do
     TargetNearestEnemy()
-    local TargetHealth = UnitHealth("target")
-    if Zorlen_isActiveEnemy("target") and (COMBAT_SCANNER.lowestHealth + 10) > TargetHealth then
+    if COMBAT_SCANNER.lowestHealthName == ZorlenX_CurrentTargetName() and Zorlen_isActiveEnemy("target") and not Zorlen_isBreakOnDamageCC("target") then
       return true
     end
+  end
+end
+
+function targetHighestHP()
+  if not COMBAT_SCANNER.highestHealth then
+    return false
+  end
+  if Zorlen_isActiveEnemy("target") and (COMBAT_SCANNER.highestHealth - 10) < TargetHealth and not Zorlen_isBreakOnDamageCC("target") then
+    return true
   end
 end
 
@@ -156,6 +201,7 @@ function targetFallbackTarget()
   for i = 1, 6 do
     TargetNearestEnemy()
     if UnitIsFriend("player","targettarget") then
+      ZorlenX_Log("targetFallbackTarget(): Found Target")
       return true
     end
   end
@@ -180,14 +226,7 @@ function targetMainTarget()
   end
 end
 
-function targetHighestHP()
-  if not COMBAT_SCANNER.highestHealth then
-    return false
-  end
-  if Zorlen_isActiveEnemy("target") and (COMBAT_SCANNER.highestHealth - 10) < TargetHealth and not ZorlenX_IsCrowdControlled() then
-    return true
-  end
-end
+
 
 function targetEnemyAttackingMe()
   if not (COMBAT_SCANNER.enemiesAggroPlayer > 0) then
@@ -229,14 +268,14 @@ function ZorlenX_FindUntargetedTarget()
   if not sheepSafeConfig.toggle then
     return false
   end
-  if self == nil then
-    self = sheepSafe
-  end
-  local myCCisApplied = ZorlenX_ccIsApplied(sheepSafe.ccicon)
-  local checkRaidAndPartyTargets = false
-  if myCCisApplied then
+
+  if ZorlenX_myCcIsApplied() then
     -- not targeting is done yet. 
     sheepSafe:p("Aborting: I have a cc already.");
+    return false
+  end
+
+  if not COMBAT_SCANNER.ccAbleTargetExists then
     return false
   end
 
@@ -245,9 +284,6 @@ function ZorlenX_FindUntargetedTarget()
     return false
   end
 
-  if not COMBAT_SCANNER.ccAbleTargetExists then
-    return false
-  end
   -- main loop to find the actual target
   for i = 1, 6 do
     TargetNearestEnemy()
@@ -274,7 +310,7 @@ function ZorlenX_isUnitCCable(unit)
     return false
   end
 
-  if ZorlenX_IsCrowdControlled() then
+  if Zorlen_isBreakOnDamageCC("target") then
     return false
   end
 
@@ -287,6 +323,52 @@ function ZorlenX_isUnitCCable(unit)
   end
 end 
 
+-- To solve the very strange behaviour on Elysium 
+function ZorlenX_mobIsBoss(unit)
+  local bosses = {}
+  local unitName = UnitName(unit)
+  bosses["Scarlet Commander Mograine"] = true
+  bosses["High Inquisitor Whitemane"] = true
+  bosses["Nekrum Gutchewer"] = true
+  bosses["Shadowpriest Sezz'ziz"] = true
+  bosses["Chief Ukorz Sandscalp"] = true
+  bosses["Ruuzlu"] = true
+  if UnitClassification("target") == "worldboss" or bosses[unitName] then
+    return true
+  end
+  return false
+end
+
+function ZorlenX_IsTotem(unit)
+  if not UnitExists(unit) then
+    return false
+  end
+  local targetName = UnitName(unit)
+  local t = {
+    [LOCALIZATION_ZORLEN.GreaterHealingWard] = true,
+    [LOCALIZATION_ZORLEN.LavaSpoutTotem] = true,
+    [LOCALIZATION_ZORLEN.TremorTotem] = true,
+    [LOCALIZATION_ZORLEN.EarthbindTotem] = true,
+    [LOCALIZATION_ZORLEN.HealingStreamTotem] = true,
+    [LOCALIZATION_ZORLEN.ManaTideTotem] = true,
+    [LOCALIZATION_ZORLEN.ManaSpringTotem] = true,
+    [LOCALIZATION_ZORLEN.SearingTotem] = true,
+    [LOCALIZATION_ZORLEN.MagmaTotem] = true,
+    [LOCALIZATION_ZORLEN.FireNovaTotem] = true,
+    [LOCALIZATION_ZORLEN.GroundingTotem] = true,
+    [LOCALIZATION_ZORLEN.WindfuryTotem] = true,
+    [LOCALIZATION_ZORLEN.FlametongueTotem] = true,
+    [LOCALIZATION_ZORLEN.StrengthOfEarthTotem] = true,
+    [LOCALIZATION_ZORLEN.GraceOfAirTotem] = true,
+    [LOCALIZATION_ZORLEN.StoneskinTotem] = true,
+    [LOCALIZATION_ZORLEN.WindwallTotem] = true,
+    [LOCALIZATION_ZORLEN.FireResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.FrostResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.NatureResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.PoisonCleansingTotem] = true
+  }
+  return t[targetName]
+end
 
 local zorlenx_frame_count = 1
 function zorlenx_unique_frame_name()

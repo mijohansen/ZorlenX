@@ -14,21 +14,31 @@ function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
     return true
   end
   
-  if targetEnemyAttackingCasters() then
+  --if targetEnemyAttackingCasters() then
     --hurling a rank 1 frostbolt.
-    if not Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) then
-      return true
-    else
-      ZorlenX_Log("Failed to deal with enemy targeting casters.")
-    end
-  end
+    --if not Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) --then
+      --return true
+    --else
+      --ZorlenX_Log("Failed to deal with enemy targeting casters.")
+    --end
+  --end
+  
   -- we need to do some smart targeting here. For now. AssistMasterOrFirst and best.
   if targetMainTarget() and ZorlenX_MageDPS() then
     return true
   end
+  
+  if Zorlen_ManaPercent("player") < 15 and not isShootActive() then
+    -- need a default when very low on mana...
+    -- just do some extra Wanding when in healmode
+    ZorlenX_Log("Low mana. Starting to use wand on target.")
+    castShoot()
+  end
+  
 end
 
 -- target mob that aggroes cloth with a frost bolt.
+
 function ZorlenX_MageDefensiveMove()
 
 end
@@ -69,42 +79,27 @@ function ZorlenX_MageCombustion()
 end
 
 function ZorlenX_MageDPS()
+  if Zorlen_isImmune("Fireball", "target") and castFrostbolt() then
+    return true
+  end
+  
   if ZorlenX_MageSmartScorch() then
     return true
   end
   if ZorlenX_MageCombustion() then
     return true
   end
-  if castFireBlast()  then
+  if castFireBlast() then
     return true
   end
 
   if castFireball() then
     return true
   end
-  if Zorlen_checkCooldownByName("Fireball") and not isShootActive() then
-    castShoot()
-  end
   return false
 end
 
-function ZorlenX_MageConjure()
-  if UnitAffectingCombat("player") then
-    return
-  end
-  if Zorlen_isChanneling() or Zorlen_isCasting() then
-    return
-  end
-  if Zorlen_GiveContainerItemCountByName("Conjured Spring Water") < 60 then 
-    return Zorlen_castSpellByName("Conjure Water")
-  end
-  if Zorlen_IsSpellKnown("Conjure Mana Jade") and not manaJadeExists() then 
-    return Zorlen_castSpellByName("Conjure Mana Jade")
-  end
-  if Zorlen_IsSpellKnown("Conjure Mana Agate") and not manaAgateExists() then 
-    return Zorlen_castSpellByName("Conjure Mana Agate")
-  end
-end
+
 
 function manaAgateExists()
   return (Zorlen_GiveContainerItemCountByName("Mana Agate") == 1)
@@ -157,7 +152,7 @@ function ZorlenX_MageConjure()
   if Zorlen_isCastingOrChanneling() or UnitAffectingCombat("player") then
     return false
   end
-  if Zorlen_ManaPercent("player") < 20 then
+  if Zorlen_ManaPercent("player") < 25 then
     return false
   end
   if isMage("player") and ZorlenX_MageWaterCount() < 60 and Zorlen_castSpellByName("Conjure Water") then 

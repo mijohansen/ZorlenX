@@ -222,7 +222,7 @@ function sheepSafe:SheepSafe()
     return false
   end
 
-  if ZorlenX_IsCrowdControlled() then
+  if Zorlen_isBreakOnDamageCC("target") then
     ZorlenX_Log("Target is Crowd Controlled, skipping...");
     return false
   end
@@ -468,26 +468,6 @@ function sheepSafe:trace(msg)
   if (tracer) then
     tracer.Log("SheepSafe", msg)
   end
-end
-
-function ZorlenX_IsCrowdControlled()
-  if not UnitExists("target") then
-    return false
-  end
-  local tdb
-  local stripped
-  for i=1,16 do
-    tdb = UnitDebuff("target",i);
-    if tdb then
-      stripped = string.sub(tdb,17)
-      if sheepSafe.ccs[stripped] then
-        return true;
-      end
-    else
-      return false;
-    end
-  end
-
 end
 
 function sheepSafe:SheepSafeCombo()

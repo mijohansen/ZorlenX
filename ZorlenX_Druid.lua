@@ -65,7 +65,7 @@ end
 
 -- /script ZorlenX_AttackBear()
 function ZorlenX_AttackBear()
-  ZorlenX_CombatScan() --just for debugging while grinding.
+  --ZorlenX_CombatScan() --just for debugging while grinding.
   if UnitExists("target") then
     local result = CheckInteractDistance("target",2)
     -- ZorlenX_Log(result)

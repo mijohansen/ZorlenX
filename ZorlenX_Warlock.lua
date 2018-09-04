@@ -18,16 +18,12 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
   if LPMULTIBOX.UNIQUE_SPELL and Zorlen_IsSpellKnown(lpm_warlock_curse) then
     unique_curse = true
   end
-
-  if dps_pet then	
+  -- this seem to not happen... Why?
+  if dps_pet then
+    -- this spell only summons.
     LazyPigMultibox_WarlockPet(lpm_pet)
   end	
-
-  if dps_pet then
-    ZorlenX_PetAttack()
-    Warlock_PetSuffering()
-  end
-
+  
   if UnitAffectingCombat("player") and Zorlen_HealthPercent("player") < 15 and LazyPigMultibox_IsPetSpellKnown("Sacrifice") and not Zorlen_checkBuffByName("Sacrifice", "player") and not Zorlen_checkBuffByName("Blessing of Protection", "player") then
     zSacrifice();
     LazyPigMultibox_Annouce("lpm_slaveannouce","Sacrifice");
@@ -37,17 +33,19 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
     return true
   end
 
-  -- target will allways be master at this point. Ensure that dots are up on master target.
-  if not isCorruption() and Zorlen_castSpellByName("Corruption") then
-    return true
-  end
 
-  if not isImmolate() and castImmolate() then
-    return true
+
+  if targetMainTarget() and dps_pet then
+    ZorlenX_PetAttack()
+    Warlock_PetSuffering()
   end
 
   if targetEnemyAttackingCasters()  then
-    if COMBAT_SCANNER.looseEnemies > 1 and CheckInteractDistance("target", 2) and not Zorlen_isDieingEnemy("target") and (castDeathCoil() or castFear()) then
+    if COMBAT_SCANNER.looseEnemies > 1 
+    and CheckInteractDistance("target", 2) 
+    and not Zorlen_isDieingEnemy("target") 
+    and ZorlenX_TimeLock("DefensiveTargetEnemyAttackingCasters", 10)
+    and (castDeathCoil() or castFear()) then
       return true
     else
       -- targeting function is run, we go back to assist on Master target.
@@ -59,6 +57,16 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
     return
   end
 
+
+
+  -- target will allways be master at this point. Ensure that dots are up on master target.
+  if not isCorruption() and Zorlen_castSpellByName("Corruption") then
+    return true
+  end
+
+  if not isImmolate() and castImmolate() then
+    return true
+  end
   if Zorlen_ManaPercent("player") < 70 and Zorlen_HealthPercent("player") > 75 and castLifeTap() then
     return
   end	
@@ -240,7 +248,7 @@ function ZorlenX_CreateHealthStone()
     end
   end
 end 
-
+--should be common functions
 function healthstoneExists()
   local healthstoneNames =  {
     "Minor Healthstone",
@@ -258,4 +266,9 @@ function healthstoneExists()
   return existingHealthstoneName
 end
 
-
+function useHealthstone()
+  local healthstoneName = healthstoneExists()
+  if healthstoneName and Zorlen_useContainerItemByName(healthstoneName) then
+    return true  
+  end
+end

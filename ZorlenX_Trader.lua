@@ -31,9 +31,9 @@ function ZorlenX_DropItemOnPlayerByName(player_name)
 end
 
 function ZorlenX_OrderDrinks()
-  --if TradeFrame:IsVisible() then
-  --  return false
-  --end
+  if not isMageInGroup() then
+    return false
+  end
   if usesMana(player) and not isMage("player") and not Zorlen_isMoving() and isGrouped() and Zorlen_notInCombat() then
     Zorlen_UpdateDrinkItemInfo()
     local bag, slot, fullcount, level = Zorlen_GetDrinkSlotNumber()
@@ -62,7 +62,11 @@ function ZorlenX_OrderHealthstone()
   if isWarlock("player") then
     return false
   end
-
+  
+  if not isWarlockInGroup() then
+    return false
+  end
+  
   if Zorlen_isMoving() or not isGrouped() then
     return false
   end

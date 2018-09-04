@@ -54,25 +54,29 @@ end
 
 -- Eventhough I can count active enemies there will be need to solve for
 -- CC etc.
-function ZorlenX_DpsMultiTarget()
-  return ZorlenX_UseClassScript(true)
-end
 
 function ZorlenX_DpsSingleTarget()
   return ZorlenX_UseClassScript()
 end
 
-function ZorlenX_isOutside()
-  return not ZorlenX_inRaidOrDungeon()
+function ZorlenX_DpsRemoteTarget()
+  return ZorlenX_UseClassScript(true)
 end
 
-function ZorlenX_inRaidOrDungeon()
-  return (LazyPig_Raid() or LazyPig_Dungeon())
+function ZorlenX_DpsMultiTarget()
+  return ZorlenX_UseClassScript(true)
 end
 
+function ZorlenX_DpsBurst()
+  return ZorlenX_UseClassScript()
+end
+
+function ZorlenX_DpsDesperate()
+  return ZorlenX_UseClassScript()
+end
 
 -- /script ZorlenX_UseClassScript()
-function ZorlenX_UseClassScript(multitarget, spellcaster)
+function ZorlenX_UseClassScript(multitarget, spellcaster, active)
   local time = GetTime()
   if LPM_TIMER.SCRIPT_USE < time then	
     LPM_TIMER.SCRIPT_USE = time + 0.5
@@ -84,7 +88,14 @@ function ZorlenX_UseClassScript(multitarget, spellcaster)
       ZorlenX_Log("LPMULTIBOX.STATUS is turned off.")
       return
     end
-
+    if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
+      SitOrStand()
+    end
+    
+    if Zorlen_HealthPercent("player") < 25 and useHealthstone() then
+      return true
+    end
+    
     if not Zorlen_isCastingOrChanneling() then
       -- added support for Decursive, just running the script when not Channeling or casting
       if Dcr_Clean(false,false) then
@@ -94,20 +105,15 @@ function ZorlenX_UseClassScript(multitarget, spellcaster)
       -- performing combat scan
       local COMBAT_SCANNER = ZorlenX_CombatScan()
       -- added support for SheepSafe, just running the script when not Channeling or casting
+      -- this should also stop casting... CC is more important, or is it?
       if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.looseEnemies > 1) and ZorlenX_SheepSafeUntargeted() then
-        ZorlenX_Log("Tried to sheepsafe.")
+        ZorlenX_Log("Tried to Crowdcontrol target.")
         return 
       end
 
-
-      --  ingen targeting foregår før class scripts
       if dps or dps_pet or heal  then
-        --doing some default targeting probably good to do that before running class scripts?
-        --if COMBAT_SCANNER.looseEnemies == 1 then
-        --end
-        --LazyPigMultibox_AssistMaster()
-        dps = dps and Zorlen_isEnemy("target") and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
-        ZorlenX_Log("Running class script.")
+        
+        dps = dps and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
         if isPaladin("player") then
           ZorlenX_Paladin(dps, dps_pet, heal, multitarget);
         elseif isShaman("player") then
@@ -134,7 +140,7 @@ function ZorlenX_UseClassScript(multitarget, spellcaster)
     -- spesific function for when casting evaluating target etc.
     -- We will not change target unless player is idle
     if Zorlen_isCasting() and UnitExists("target") and Zorlen_isEnemy("target") then
-      if ZorlenX_IsCrowdControlled() or UnitIsDeadOrGhost("target") then
+      if Zorlen_isBreakOnDamageCC("target") or UnitIsDeadOrGhost("target") then
         SpellStopCasting()
         ZorlenX_Log("Tried to stop spell due to bad target.")
       end
@@ -162,6 +168,14 @@ function FollowLeader()
   end
 end
 
+function ZorlenX_isOutside()
+  return not ZorlenX_inRaidOrDungeon()
+end
+
+function ZorlenX_inRaidOrDungeon()
+  return (LazyPig_Raid() or LazyPig_Dungeon())
+end
+
 
 -- /script ZorlenX_OutOfCombat()
 function ZorlenX_OutOfCombat()
@@ -173,56 +187,52 @@ function ZorlenX_OutOfCombat()
   if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
     SitOrStand()
   end
-  
+
   if ZorlenX_DruidEnsureCasterForm() then
     ZorlenX_Log("Ensuring Caster Form for druid", LPMULTIBOX)
     return true
   end
-  
+
   -- casting doesnt affect trade. just trade!
   -- need to toggle so that concurrency never happens.
-  if ZorlenX_Toggle("OutOfCombatToggler") and ZorlenX_OrderDrinks() then
+  if ZorlenX_Toggle("OutOfCombatToggler") or ZorlenX_OrderDrinks() then
     ZorlenX_Log("Ordering Drinks")
   elseif ZorlenX_OrderHealthstone() then
     ZorlenX_Log("Ordering Healthstone")
   end
-  
 
   if Zorlen_isCastingOrChanneling() or Zorlen_inCombat() then
     ZorlenX_Log("In Combat og already casting skipping.")
     return
   end
-  
-  
+
   if LPMULTIBOX.SCRIPT_REZ and not Zorlen_isMoving() and LazyPigMultibox_Rez() then
     ZorlenX_Log("Rezzing")
     return 
   end
-  
+
   if LPMULTIBOX.SCRIPT_BUFF and LazyPigMultibox_UnitBuff() then
     ZorlenX_Log("Buffing")
     return
   end
-  
+
   if isWarlock("player")  and not Zorlen_isMoving() and LazyPigMultibox_SmartSS() then
     ZorlenX_Log("Creating Soulstone")
     return
   end
-  
+
   if isWarlock("player")  and not Zorlen_isMoving() and ZorlenX_CreateHealthStone() then
     ZorlenX_Log("Creating Healthstone")
     return
   end
-  
-  if isMage("player") and not Zorlen_isMoving() and ZorlenX_MageConjure() then
+
+  if isMage("player") and not Zorlen_isMoving() and  Zorlen_ManaPercent("player") > 70 and ZorlenX_MageConjure() then
     ZorlenX_Log("Conjuring water")
     return
   end
 
-
-
   --if Zorlen_isMoving() and Zorlen_ManaPercent("player") > 90 then 
-    -- throw som hots around.
+  -- throw som hots around.
   --end
   if Zorlen_Drink() then
     return
@@ -261,54 +271,72 @@ function ZorlenX_PetAttack()
   end
 end
 
-function ZorlenX_IsTotem(unit)
-  if not UnitExists(unit) then
-    return false
-  end
-  local targetName = UnitName(unit)
-  local t = {
-    [LOCALIZATION_ZORLEN.GreaterHealingWard] = true,
-    [LOCALIZATION_ZORLEN.LavaSpoutTotem] = true,
-    [LOCALIZATION_ZORLEN.TremorTotem] = true,
-    [LOCALIZATION_ZORLEN.EarthbindTotem] = true,
-    [LOCALIZATION_ZORLEN.HealingStreamTotem] = true,
-    [LOCALIZATION_ZORLEN.ManaTideTotem] = true,
-    [LOCALIZATION_ZORLEN.ManaSpringTotem] = true,
-    [LOCALIZATION_ZORLEN.SearingTotem] = true,
-    [LOCALIZATION_ZORLEN.MagmaTotem] = true,
-    [LOCALIZATION_ZORLEN.FireNovaTotem] = true,
-    [LOCALIZATION_ZORLEN.GroundingTotem] = true,
-    [LOCALIZATION_ZORLEN.WindfuryTotem] = true,
-    [LOCALIZATION_ZORLEN.FlametongueTotem] = true,
-    [LOCALIZATION_ZORLEN.StrengthOfEarthTotem] = true,
-    [LOCALIZATION_ZORLEN.GraceOfAirTotem] = true,
-    [LOCALIZATION_ZORLEN.StoneskinTotem] = true,
-    [LOCALIZATION_ZORLEN.WindwallTotem] = true,
-    [LOCALIZATION_ZORLEN.FireResistanceTotem] = true,
-    [LOCALIZATION_ZORLEN.FrostResistanceTotem] = true,
-    [LOCALIZATION_ZORLEN.NatureResistanceTotem] = true,
-    [LOCALIZATION_ZORLEN.PoisonCleansingTotem] = true
-  }
-  return t[targetName]
+function isDruidInGroup()
+	return ZorlenX_classInGroup("DRUID")
 end
 
+function isTroll()
+  return Zorlen_isCurrentRaceTroll
+end
 
+function isHunterInGroup()
+	return ZorlenX_classInGroup("HUNTER") 
+end
 
--- To solve the very strange behaviour on Elysium 
-function ZorlenX_mobIsBoss(unit)
-  local bosses = {}
-  local unitName = UnitName(unit)
-  bosses["Scarlet Commander Mograine"] = true
-  bosses["High Inquisitor Whitemane"] = true
-  bosses["Nekrum Gutchewer"] = true
-  bosses["Shadowpriest Sezz'ziz"] = true
-  bosses["Chief Ukorz Sandscalp"] = true
-  bosses["Ruuzlu"] = true
-  if UnitClassification("target") == "worldboss" or bosses[unitName] then
-    return true
+function isPaladinInGroup()
+	return ZorlenX_classInGroup("PALADIN") 
+end
+
+function isPriestInGroup()
+	return ZorlenX_classInGroup("PRIEST") 
+end
+
+function isMageInGroup()
+	return ZorlenX_classInGroup("MAGE") 
+end
+
+function isRogueInGroup()
+	return ZorlenX_classInGroup("ROGUE") 
+end
+
+function isShamanInGroup()
+	return ZorlenX_classInGroup("SHAMAN") 
+end
+
+function isWarlockInGroup()
+	return ZorlenX_classInGroup("WARLOCK") 
+end
+
+function isWarriorInGroup()
+	return ZorlenX_classInGroup("WARRIOR") 
+end
+
+function ZorlenX_classInGroup(className)
+  local counter = nil
+  local u = nil
+  
+  if UnitInRaid("player") then
+    NumMembers = GetNumRaidMembers()
+    counter = 1
+    groupType = "raid"
+  else
+    NumMembers = GetNumPartyMembers()
+    counter = 0
+    groupType = "party"
+  end
+
+  while counter <= NumMembers do
+    local unit = groupType .. "" .. counter
+    if Zorlen_isClass(className, unit) then
+      return true
+    end
+    counter = counter + 1
   end
   return false
 end
+
+
+
 
 -- Zorlen_MakeMacro(name, macro, percharacter, macroicontecture, iconindex, replace, show, nocreate, replacemacroindex, replacemacroname)
 -- Zorlen_MakeMacro(LOCALIZATION_ZORLEN.EatMacroName, "/zorlen eat", 0, "Spell_Misc_Food", nil, 1, show)
@@ -332,7 +360,7 @@ function ZorlenX_Debug(value)
 end
 
 function ZorlenX_Log(msg,value)
-  local playerTargetName = UnitName("playertarget")
+  local playerTargetName = UnitName("target")
   if not playerTargetName then
     playerTargetName = "<Unknown>"
   end
@@ -370,11 +398,11 @@ function round(input, places)
 end
 
 function table_sum(t)
-    local sum = 0
-    for k,v in pairs(t) do
-        sum = sum + v
-    end
-    return sum
+  local sum = 0
+  for k,v in pairs(t) do
+    sum = sum + v
+  end
+  return sum
 end
 
 function table_length(T)
