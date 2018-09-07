@@ -1,7 +1,7 @@
 ## Interface: 11200
 ## Title: ZorlenX
-## Version: 0.02
-## Notes: Multiboxing Tool
+## Version: 0.03
+## Notes: An extension to the classic addon Zorlen, expanded with some helpful features. Inspired by _LazyPig 
 ## Author: mijohansen
 ## SavedVariablesPerCharacter: ZORLENX
 ## Dependencies: _LazyPig, _LazyPigMultibox, Zorlen, QuickHeal, SmartBuff, MobInfo2, Decursive

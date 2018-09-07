@@ -9,7 +9,7 @@ local lpm_pet = "Imp"
 local lpm_warlock_curse = "Curse of the Elements"
 local lpm_firelock = true
 
-function ZorlenX_Warlock(dps, dps_pet, heal)
+function ZorlenX_Warlock(dps, dps_pet, heal, aoe, burst, panic, isSlave)
   local manapercent = UnitMana("player") / UnitManaMax("player")
   local healthpercent = UnitHealth("player") / UnitHealthMax("player")
   local player_affected = UnitAffectingCombat("player")
@@ -19,11 +19,11 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
     unique_curse = true
   end
   -- this seem to not happen... Why?
-  if dps_pet then
+  if not panic and dps_pet then
     -- this spell only summons.
     LazyPigMultibox_WarlockPet(lpm_pet)
   end	
-  
+
   if UnitAffectingCombat("player") and Zorlen_HealthPercent("player") < 15 and LazyPigMultibox_IsPetSpellKnown("Sacrifice") and not Zorlen_checkBuffByName("Sacrifice", "player") and not Zorlen_checkBuffByName("Blessing of Protection", "player") then
     zSacrifice();
     LazyPigMultibox_Annouce("lpm_slaveannouce","Sacrifice");
@@ -40,12 +40,11 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
     Warlock_PetSuffering()
   end
 
-  if targetEnemyAttackingCasters()  then
+  if not panic and not aoe and targetEnemyAttackingCasters() then
     if COMBAT_SCANNER.looseEnemies > 1 
     and CheckInteractDistance("target", 2) 
     and not Zorlen_isDieingEnemy("target") 
-    and ZorlenX_TimeLock("DefensiveTargetEnemyAttackingCasters", 10)
-    and (castDeathCoil() or castFear()) then
+    and ((not fearIsApplied() and castFear()) or castDeathCoil()) then
       return true
     else
       -- targeting function is run, we go back to assist on Master target.
@@ -53,17 +52,23 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
     end
   end
 
-  if dps and targetMainTarget() and LazyPigMultibox_WarlockDPS(unique_curse) then
-    return
-  end
-
-
-
-  -- target will allways be master at this point. Ensure that dots are up on master target.
-  if not isCorruption() and Zorlen_castSpellByName("Corruption") then
+  if not aoe and dps and targetMainTarget() and LazyPigMultibox_WarlockDPS(unique_curse) then
     return true
   end
 
+  if aoe and dps and ZorlenX_WarlockAoe() then
+    return true
+  end
+  -- if we have dotted all targets, focus on killing the one with highest HP
+  if aoe and dps and targetHighestHP() and LazyPigMultibox_WarlockDPS(LOCALIZATION_ZORLEN.CurseOfAgony) then
+    return true
+  end
+  
+  if not isCorruption() and Zorlen_castSpellByName("Corruption") then
+    return true
+  end
+  
+  -- target will allways be master at this point. Ensure that dots are up on master target.
   if not isImmolate() and castImmolate() then
     return true
   end
@@ -72,6 +77,21 @@ function ZorlenX_Warlock(dps, dps_pet, heal)
   end	
 
 end
+
+-- /script ZorlenX_WarlockAoe()
+
+function ZorlenX_WarlockAoe()
+  return targetAndEnsureDots({
+      LOCALIZATION_ZORLEN.CurseOfAgony,
+      LOCALIZATION_ZORLEN.Corruption,
+      LOCALIZATION_ZORLEN.Immolate,
+      LOCALIZATION_ZORLEN.SiphonLife
+    })
+end 
+
+function fearIsApplied()
+  return ZorlenX_ccIsApplied("Spell_Shadow_Possession")
+end 
 
 function LazyPigMultibox_WarlockDPS(curse)
 

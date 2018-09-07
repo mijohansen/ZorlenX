@@ -1,6 +1,5 @@
 -- at this point lacks target.
-function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
-
+function ZorlenX_Mage(dps, dps_pet, heal, aoe, burst, panic, isSlave)
   if Zorlen_isCastingOrChanneling() then
     return true
   end
@@ -24,7 +23,7 @@ function ZorlenX_Mage(dps, dps_pet, heal, rez, buff)
   --end
   
   -- we need to do some smart targeting here. For now. AssistMasterOrFirst and best.
-  if targetMainTarget() and ZorlenX_MageDPS() then
+  if ((aoe and targetHighestHP()) or targetMainTarget()) and ZorlenX_MageDPS() then
     return true
   end
   
@@ -100,6 +99,11 @@ function ZorlenX_MageDPS()
 end
 
 
+function ZorlenX_MageAOE()
+  -- check if there exists enough targets to do aoe... +4
+  --castArcaneExplosion()
+  --LOCALIZATION_ZORLEN.FrostNova
+end
 
 function manaAgateExists()
   return (Zorlen_GiveContainerItemCountByName("Mana Agate") == 1)

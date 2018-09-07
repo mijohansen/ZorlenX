@@ -5,7 +5,7 @@ local unique_judgement = "Judgement of Wisdom"
 --local unique_seal = "Seal of Righteousness"
 
 
-function ZorlenX_Paladin(dps, dps_pet, heal)
+function ZorlenX_Paladin(dps, dps_pet, heal, aoe, burst, panic, isSlave)
 	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
 	
 	if locked  then

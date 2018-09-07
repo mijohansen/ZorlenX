@@ -1,7 +1,5 @@
 COMBAT_SCANNER = {}
 
--- @TODO Need to implement 
-
 function ZorlenX_resetCombatScanner()
   COMBAT_SCANNER.scanTime = 0
   COMBAT_SCANNER.scanIterations = 0
@@ -19,6 +17,10 @@ function ZorlenX_resetCombatScanner()
   COMBAT_SCANNER.enemiesInAoeRange = 0
   COMBAT_SCANNER.ccAbleTargetExists = false
   COMBAT_SCANNER.ccsApplied = {}
+  COMBAT_SCANNER.ccAbleTargetName = false
+  COMBAT_SCANNER.enemyAggroingCasterName  = false
+  COMBAT_SCANNER.highestHealthName = false
+  COMBAT_SCANNER.lowestHealthName = false
   return COMBAT_SCANNER
 end
 
@@ -34,19 +36,17 @@ function ZorlenX_CurrentTargetFingerPrint()
   end
 end
 
+-- potensial we do a combat scan every second. Things might have changed.
 -- /script local cs = ZorlenX_CombatScan() ZorlenX_Debug(cs)
 function ZorlenX_CombatScan()
-
   if ZorlenX_TimeLock("CombatScan",1) then
     return COMBAT_SCANNER
   end
-
-  -- resetting values
-  ZorlenX_resetCombatScanner()
   if not UnitAffectingCombat("player") then
     return COMBAT_SCANNER
   end
-
+  -- resetting values
+  ZorlenX_resetCombatScanner()
   --defining some locals
   local activeLooseEnemies = {}
   local enemiesAggroPlayer = {}
@@ -56,11 +56,11 @@ function ZorlenX_CombatScan()
   local scanStart = GetTime()
   local activeEnemiesHp = {}
   local enemyScanRounds = {}
-  
+
   -- creating CC-targets
   COMBAT_SCANNER.ccsApplied[sheepSafe.ccicon] = false
   if isWarlock("player") then
-    COMBAT_SCANNER.ccsApplied[LOCALIZATION_ZORLEN.Fear] = false
+    COMBAT_SCANNER.ccsApplied["Spell_Shadow_Possession"] = false
   end
   -- setting what target we had before scan.
   COMBAT_SCANNER.lastTarget = ZorlenX_CurrentTargetFingerPrint()
@@ -83,14 +83,15 @@ function ZorlenX_CombatScan()
     if i > 5 and COMBAT_SCANNER.lastTarget == currentTargetFingerprint then
       break
     end
-    
+
     -- break iteration if we have the original target and we are seeing it for the second time
     if enemyScanRounds[currentTargetFingerprint] == 2 and (COMBAT_SCANNER.lastTarget == currentTargetFingerprint or not COMBAT_SCANNER.lastTarget)  then
       break
     end
     -- determines the CCed targets we have..
     -- doing it just once pr scan pr target.
-    if not activeEnemiesHp[currentTargetFingerprint] then
+    -- this should probably do some smarter caching in the future as we do extensive calls to UnitDebuff() which could be done once pr target.
+    if not enemyScanRounds[currentTargetFingerprint] then
       targetIsCrowdControlled = Zorlen_isBreakOnDamageCC("target")
       if targetIsCrowdControlled then
         for ccSpellname, applied in pairs(COMBAT_SCANNER.ccsApplied) do
@@ -147,7 +148,7 @@ function ZorlenX_CombatScan()
     if targetIsActiveEnemy and not activeEnemiesHp[currentTargetFingerprint] then
       activeEnemiesHp[currentTargetFingerprint] = currentTargetHealthAbs
     end
-    
+
     -- just counting how many times we a have scanned this target
     enemyScanRounds[currentTargetFingerprint] = enemyScanRounds[currentTargetFingerprint] + 1
   end
@@ -161,38 +162,126 @@ function ZorlenX_CombatScan()
   COMBAT_SCANNER.activeEnemies         = table_length(activeEnemiesHp) 
   COMBAT_SCANNER.totalEnemyHP          = table_sum(activeEnemiesHp) 
   COMBAT_SCANNER.myCCApplied           = ZorlenX_myCcIsApplied()
-  
+
   ZorlenX_UpdateCombatFrame()
-  
+
   return COMBAT_SCANNER
 end
 
 function ZorlenX_ccIsApplied(cc_spellname)
-  return COMBAT_SCANNER.ccsApplied[cc_spellname]
+  local CS = ZorlenX_CombatScan()
+  return CS.ccsApplied[cc_spellname]
+end
+
+function ZorlenX_ccAbleTargetExists()
+  local CS = ZorlenX_CombatScan()
+  return CS.ccAbleTargetExists and (CS.looseEnemies > 1)
 end
 
 function ZorlenX_myCcIsApplied()
   return ZorlenX_ccIsApplied(sheepSafe.ccicon)
 end
 
+-- function that will cycle through targets check if dot misses and try to cast it if its not applied.
+-- takes an array of dotts.
+-- /script targetAndEnsureDots({"Moonfire"})
+-- /script ZorlenX_Debug(Zorlen_GetSpellID("Hibernate"))
+-- /script ZorlenX_Debug(Zorlen_checkDebuffByName("Hibernate", "target"))
+-- /script ZorlenX_Debug(Zorlen_Button)
+function targetAndEnsureDots(dotSpells)
+  -- first doing a check to ensure that there is something to dot.
+  -- no need to dot shit that is dead.
+  local CS = ZorlenX_CombatScan()
+  local minimumDottableHp = UnitHealthMax("player") * 0.5
+  if not CS.highestHealth or (CS.highestHealth < minimumDottableHp) then
+    return false
+  end
+
+  -- first checking if all spells are ok...
+  local workingDotSpells = {}
+  for i, dotSpellname in pairs(dotSpells) do
+    local zSpellname = dotSpellname .. ".Any"
+    if Zorlen_Button[zSpellname] and Zorlen_IsSpellKnown(dotSpellname) then
+      workingDotSpells[dotSpellname] = true
+    else
+      if not Zorlen_Button[zSpellname] and Zorlen_IsSpellKnown(dotSpells) then
+        ZorlenX_Log("Warning the spell " .. dotSpellname .. " needs to be on the actionbar to use it.")
+      end
+    end
+  end
+  local scannedTargets = {}
+  local duplicateScans = 0 
+  for i = 1, 8 do
+    TargetNearestEnemy()
+    if not UnitExists("target") then
+      break
+    end
+    local currentTargetFingerprint = ZorlenX_CurrentTargetFingerPrint()
+    local currentTargetHealthAbs = ZorlenX_GetTargetCurHP()
+    if scannedTargets[currentTargetFingerprint] then
+      duplicateScans = duplicateScans + 1
+    end
+    if duplicateScans > 2 then
+      break
+    end
+    if Zorlen_isActiveEnemy("target") and currentTargetHealthAbs > minimumDottableHp then
+      for dotSpellname, spellIsOk in pairs(workingDotSpells) do
+        if spellIsOk and 
+        isActionInRangeAndUsable(dotSpellname) and 
+        not Zorlen_checkDebuffByName(dotSpellname, "target" ) and 
+        Zorlen_castSpellByName(dotSpellname) then
+          return true
+        end 
+      end
+    end
+    scannedTargets[currentTargetFingerprint] = true
+  end
+end
+
+function isActionInRangeAndUsable(spellname)
+  local zSpellname = spellname .. ".Any"
+  if Zorlen_Button[zSpellname] then
+    isUsable, notEnoughMana = IsUsableAction(Zorlen_Button[zSpellname])
+    IsInRange = IsActionInRange(Zorlen_Button[zSpellname])
+    return (isUsable and not notEnoughMana and IsInRange)
+  end
+end 
+
 function targetLowestHP()
-  if not COMBAT_SCANNER.lowestHealth then
+  local CS = ZorlenX_CombatScan()
+  if not CS.lowestHealth then
     return false
   end
   for i = 1, 6 do
     TargetNearestEnemy()
-    if COMBAT_SCANNER.lowestHealthName == ZorlenX_CurrentTargetName() and Zorlen_isActiveEnemy("target") and not Zorlen_isBreakOnDamageCC("target") then
+    if not UnitExists("target") then
+      break
+    end
+    if 
+    CS.lowestHealthName == ZorlenX_CurrentTargetName() and 
+    Zorlen_isActiveEnemy("target") and 
+    not Zorlen_isBreakOnDamageCC("target") then
       return true
     end
   end
 end
 
 function targetHighestHP()
-  if not COMBAT_SCANNER.highestHealth then
+  local CS = ZorlenX_CombatScan()
+  if not CS.highestHealth then
     return false
   end
-  if Zorlen_isActiveEnemy("target") and (COMBAT_SCANNER.highestHealth - 10) < TargetHealth and not Zorlen_isBreakOnDamageCC("target") then
-    return true
+  for i = 1, 6 do
+    TargetNearestEnemy()
+    if not UnitExists("target") then
+      break
+    end
+    if
+    CS.highestHealthName == ZorlenX_CurrentTargetName() and 
+    Zorlen_isActiveEnemy("target") and 
+    not Zorlen_isBreakOnDamageCC("target") then
+      return true
+    end
   end
 end
 
@@ -200,6 +289,9 @@ end
 function targetFallbackTarget()
   for i = 1, 6 do
     TargetNearestEnemy()
+    if not UnitExists("target") then
+      break
+    end
     if UnitIsFriend("player","targettarget") then
       ZorlenX_Log("targetFallbackTarget(): Found Target")
       return true
@@ -229,7 +321,8 @@ end
 
 
 function targetEnemyAttackingMe()
-  if not (COMBAT_SCANNER.enemiesAggroPlayer > 0) then
+  local CS = ZorlenX_CombatScan()
+  if not (CS.enemiesAggroPlayer > 0) then
     return false
   end
   for i = 1, 6 do
@@ -241,7 +334,8 @@ function targetEnemyAttackingMe()
 end
 
 function targetEnemyAttackingCasters()
-  if not (COMBAT_SCANNER.castersWithAggroCount > 0) then
+  local CS = ZorlenX_CombatScan()
+  if not (CS.castersWithAggroCount > 0) then
     return false
   end
   for i = 1, 6 do
@@ -253,7 +347,8 @@ function targetEnemyAttackingCasters()
 end
 
 function targetBoss()
-  if not COMBAT_SCANNER.isBossFight then
+  local CS = ZorlenX_CombatScan()
+  if not CS.isBossFight then
     return false
   end
   for i = 1, 6 do
@@ -265,22 +360,19 @@ function targetBoss()
 end
 
 function ZorlenX_FindUntargetedTarget()
+
   if not sheepSafeConfig.toggle then
     return false
   end
 
   if ZorlenX_myCcIsApplied() then
     -- not targeting is done yet. 
-    sheepSafe:p("Aborting: I have a cc already.");
+    ZorlenX_Log("Aborting: I have a cc already.");
     return false
   end
-
-  if not COMBAT_SCANNER.ccAbleTargetExists then
-    return false
-  end
-
-  if COMBAT_SCANNER.looseEnemies < 2 then
-    sheepSafe:p("Aborting: Too few loose enemies.");
+  local CS = ZorlenX_CombatScan()
+  if not ZorlenX_ccAbleTargetExists() then
+    ZorlenX_Log("No CCable target exists. Aborting CC.");
     return false
   end
 
@@ -299,14 +391,21 @@ function ZorlenX_FindUntargetedTarget()
 end
 
 function ZorlenX_isUnitCCable(unit) 
-  if self == nil then
-    self = sheepSafe
-  end
   if ZorlenX_mobIsBoss("target") then
     return false
   end
+
+  -- target is wounded enough, never mind
+  if Zorlen_HealthPercent("target") < 75  then
+    return false
+  end
   local targetCreatureType = UnitCreatureType("target")
-  if creaturetype and not string.find(self.validtargets, targetCreatureType) then
+  if creaturetype and not string.find(sheepSafe.validtargets, targetCreatureType) then
+    return false
+  end
+
+  -- low HP target, screw it
+  if ZorlenX_GetTargetCurHP() < UnitHealthMax("player") then
     return false
   end
 
@@ -318,9 +417,7 @@ function ZorlenX_isUnitCCable(unit)
     return false
   end
   -- ok this seem to be a good target...
-  if Zorlen_HealthPercent("target") > 60 and ZorlenX_GetTargetCurHP() > UnitHealthMax("player") then
-    return true
-  end
+  return true
 end 
 
 -- To solve the very strange behaviour on Elysium 
@@ -333,7 +430,7 @@ function ZorlenX_mobIsBoss(unit)
   bosses["Shadowpriest Sezz'ziz"] = true
   bosses["Chief Ukorz Sandscalp"] = true
   bosses["Ruuzlu"] = true
-  if UnitClassification("target") == "worldboss" or bosses[unitName] then
+  if UnitClassification(unit) == "worldboss" or bosses[unitName] then
     return true
   end
   return false
@@ -380,6 +477,8 @@ end
 ZORLENX_COMBAT_TABLE = {}
 ZORLENX_COMBAT_TABLE.values = {}
 ZORLENX_COMBAT_TABLE.keys = {}
+ZORLENX_COMBAT_TABLE.ignore = {}
+ZORLENX_COMBAT_TABLE.ignore["ccsApplied"] = true
 function ZorlenX_CreateCombatFrame()
   local localCombatScanner = ZorlenX_resetCombatScanner()
   local frame = CreateFrame("Frame",nil,UIParent)
@@ -396,17 +495,19 @@ function ZorlenX_CreateCombatFrame()
   local row_number = 0
   local line_spacing = 15
   for key, value in pairs (localCombatScanner) do
-    local value_text = frame:CreateFontString(nil, zorlenx_unique_frame_name())
-    value_text:SetFont(font, 12)
-    value_text:SetText("-")
-    value_text:SetPoint('TOPRIGHT', 0, row_number * line_spacing)
-    ZORLENX_COMBAT_TABLE.values[key] = value_text
-    local key_text = frame:CreateFontString(nil, zorlenx_unique_frame_name())
-    key_text:SetFont(font, 12)
-    key_text:SetText(key)
-    key_text:SetPoint('TOPLEFT', 0 , row_number * line_spacing)
-    ZORLENX_COMBAT_TABLE.keys[key] = key_text
-    row_number = row_number + 1
+    if not ZORLENX_COMBAT_TABLE.ignore[key] then
+      local value_text = frame:CreateFontString(nil, zorlenx_unique_frame_name())
+      value_text:SetFont(font, 12)
+      value_text:SetText("-")
+      value_text:SetPoint('TOPRIGHT', 0, row_number * line_spacing)
+      ZORLENX_COMBAT_TABLE.values[key] = value_text
+      local key_text = frame:CreateFontString(nil, zorlenx_unique_frame_name())
+      key_text:SetFont(font, 12)
+      key_text:SetText(key)
+      key_text:SetPoint('TOPLEFT', 0 , row_number * line_spacing)
+      ZORLENX_COMBAT_TABLE.keys[key] = key_text
+      row_number = row_number + 1
+    end
   end
   frame:Show()
   return frame
@@ -416,7 +517,7 @@ ZorlenX_CreateCombatFrame()
 
 function ZorlenX_UpdateCombatFrame()
   for key, value in pairs (COMBAT_SCANNER) do
-    if key ~= "ccsApplied" and ZORLENX_COMBAT_TABLE.values[key] then
+    if not ZORLENX_COMBAT_TABLE.ignore[key] and ZORLENX_COMBAT_TABLE.values[key] then
       ZORLENX_COMBAT_TABLE.values[key]:SetText(to_string(value))
     end
   end

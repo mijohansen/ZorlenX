@@ -1,6 +1,5 @@
--- Hex of Weakness for Troll Priest need to ble implemented.
-function ZorlenX_Priest(dps, dps_pet, heal)
 
+function ZorlenX_Priest(dps, dps_pet, heal, aoe, burst, panic, isSlave)
   if Zorlen_isCastingOrChanneling() then
     return
   end

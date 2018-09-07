@@ -55,126 +55,110 @@ end
 -- Eventhough I can count active enemies there will be need to solve for
 -- CC etc.
 
-function ZorlenX_DpsSingleTarget()
-  return ZorlenX_UseClassScript()
+function ZorlenX_DpsSingle()
+  return ZorlenX_UseClassScript(false,false)
 end
 
-function ZorlenX_DpsRemoteTarget()
-  return ZorlenX_UseClassScript(true)
+function ZorlenX_DpsSingleBurst()
+  return ZorlenX_UseClassScript(false,true)
 end
 
-function ZorlenX_DpsMultiTarget()
-  return ZorlenX_UseClassScript(true)
+function ZorlenX_DpsAoe()
+  return ZorlenX_UseClassScript(true,false)
 end
 
-function ZorlenX_DpsBurst()
-  return ZorlenX_UseClassScript()
+function ZorlenX_DpsAoeBurst()
+  return ZorlenX_UseClassScript(true,true)
 end
 
-function ZorlenX_DpsDesperate()
-  return ZorlenX_UseClassScript()
+function ZorlenX_DpsPanic()
+  return ZorlenX_UseClassScript(false,false,true)
 end
 
 -- /script ZorlenX_UseClassScript()
-function ZorlenX_UseClassScript(multitarget, spellcaster, active)
-  local time = GetTime()
-  if LPM_TIMER.SCRIPT_USE < time then	
-    LPM_TIMER.SCRIPT_USE = time + 0.5
-    local dps = LPMULTIBOX.SCRIPT_DPS
-    local dps_pet = LPMULTIBOX.SCRIPT_DPSPET
-    local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
-    local playerIsSlave = not ZorlenX_PlayerIsLeader() and LazyPigMultibox_SlaveCheck()
-    if not LPMULTIBOX.STATUS then
-      ZorlenX_Log("LPMULTIBOX.STATUS is turned off.")
+function ZorlenX_UseClassScript(aoe, burst, panic)
+  if not ZorlenX_TimeLock("ZorlenX_UseClassScript" , 0.5) then
+    return false
+  end
+  
+  if not LPMULTIBOX.STATUS then
+    ZorlenX_Log("LPMULTIBOX is turned off.")
+    return
+  end
+  
+  local dps = LPMULTIBOX.SCRIPT_DPS
+  local dps_pet = LPMULTIBOX.SCRIPT_DPSPET
+  local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
+  -- little trick to get slave status regardless of who is the party leader
+  local isSlave = true and IsControlKeyDown()
+
+  -- just to get up if we know you are drinking.
+  if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
+    SitOrStand()
+  end
+
+  if Zorlen_HealthPercent("player") < 25 and useHealthstone() then
+    return true
+  end
+  -- spesific function for when casting evaluating target etc.
+  -- We will not change target unless player is idle
+  if Zorlen_isCasting() and UnitExists("target") and Zorlen_isEnemy("target") then
+    if Zorlen_isBreakOnDamageCC("target") or UnitIsDeadOrGhost("target") then
+      SpellStopCasting()
+      ZorlenX_Log("Tried to stop spell due to bad target.")
+    end
+  end
+
+  if not Zorlen_isCastingOrChanneling() then
+    -- added support for Decursive, just running the script when not Channeling or casting
+    if not panic and Dcr_Clean(false,false) then
+      ZorlenX_Log("Tried to decursive.")
       return
     end
-    if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
-      SitOrStand()
-    end
     
-    if Zorlen_HealthPercent("player") < 25 and useHealthstone() then
-      return true
-    end
-    
-    if not Zorlen_isCastingOrChanneling() then
-      -- added support for Decursive, just running the script when not Channeling or casting
-      if Dcr_Clean(false,false) then
-        ZorlenX_Log("Tried to decursive.")
-        return
-      end
-      -- performing combat scan
-      local COMBAT_SCANNER = ZorlenX_CombatScan()
-      -- added support for SheepSafe, just running the script when not Channeling or casting
-      -- this should also stop casting... CC is more important, or is it?
-      if COMBAT_SCANNER.ccAbleTargetExists and (COMBAT_SCANNER.looseEnemies > 1) and ZorlenX_SheepSafeUntargeted() then
-        ZorlenX_Log("Tried to Crowdcontrol target.")
-        return 
-      end
-
-      if dps or dps_pet or heal  then
-        
-        dps = dps and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
-        if isPaladin("player") then
-          ZorlenX_Paladin(dps, dps_pet, heal, multitarget);
-        elseif isShaman("player") then
-          --ZorlenX_Shaman(dps, dps_pet, heal, multitarget);
-        elseif isDruid("player") then
-          ZorlenX_Druid(dps, dps_pet, heal, multitarget);	
-        elseif isPriest("player") then
-          ZorlenX_Priest(dps, dps_pet, heal, multitarget);
-        elseif isWarlock("player") then
-          ZorlenX_Warlock(dps, dps_pet, heal, multitarget);
-        elseif isMage("player") then
-          ZorlenX_Mage(dps, dps_pet, heal, multitarget);
-        elseif isHunter("player") then
-          --ZorlenX_Hunter(dps, dps_pet, heal, multitarget);
-        elseif isRogue("player") then
-          --ZorlenX_Rogue(dps, dps_pet, heal, multitarget);
-        elseif isWarrior("player") then
-          --ZorlenX_Warrior(dps, dps_pet, heal, multitarget);
-        end
-        return true
-      end	
-    end
-
-    -- spesific function for when casting evaluating target etc.
-    -- We will not change target unless player is idle
-    if Zorlen_isCasting() and UnitExists("target") and Zorlen_isEnemy("target") then
-      if Zorlen_isBreakOnDamageCC("target") or UnitIsDeadOrGhost("target") then
-        SpellStopCasting()
-        ZorlenX_Log("Tried to stop spell due to bad target.")
-      end
-    end
-
-    if LPMULTIBOX.FA_DISMOUNT and LazyPigMultibox_Dismount() then
+    -- added support for SheepSafe, just running the script when not Channeling or casting
+    -- this should also stop casting... CC is more important, or is it?
+    if not aoe and isSlave and ZorlenX_ccAbleTargetExists() and ZorlenX_SheepSafeUntargeted() then
+      ZorlenX_Log("Tried to Crowdcontrol target.")
       return 
     end
 
-    if LazyPigMultibox_Schedule() or LazyPigMultibox_ScheduleSpell() then
-      return
-    end
-
-    return nil
-  else
-    return
-  end	
-end
-
--- 
-function FollowLeader()
-  if isGrouped() and not Zorlen_isCastingOrChanneling()  then
-    local leader = LazyPigMultibox_ReturnLeaderUnit()
-    FollowUnit(leader)
+    if dps or dps_pet or heal  then
+      dps = dps and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
+      if isPaladin("player") then
+        ZorlenX_Paladin(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isShaman("player") then
+        --ZorlenX_Shaman(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isDruid("player") then
+        ZorlenX_Druid(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isPriest("player") then
+        ZorlenX_Priest(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isWarlock("player") then
+        ZorlenX_Warlock(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isMage("player") then
+        ZorlenX_Mage(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isHunter("player") then
+        --ZorlenX_Hunter(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isRogue("player") then
+        --ZorlenX_Rogue(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      elseif isWarrior("player") then
+        --ZorlenX_Warrior(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+      end
+      return true
+    end	
   end
+
+  if LPMULTIBOX.FA_DISMOUNT and LazyPigMultibox_Dismount() then
+    return 
+  end
+
+  if LazyPigMultibox_Schedule() or LazyPigMultibox_ScheduleSpell() then
+    return
+  end
+
+  return nil
 end
 
-function ZorlenX_isOutside()
-  return not ZorlenX_inRaidOrDungeon()
-end
-
-function ZorlenX_inRaidOrDungeon()
-  return (LazyPig_Raid() or LazyPig_Dungeon())
-end
 
 
 -- /script ZorlenX_OutOfCombat()
@@ -239,6 +223,21 @@ function ZorlenX_OutOfCombat()
   end
 end
 
+function FollowLeader()
+  if isGrouped() and not Zorlen_isCastingOrChanneling()  then
+    local leader = LazyPigMultibox_ReturnLeaderUnit()
+    FollowUnit(leader)
+  end
+end
+
+function ZorlenX_isOutside()
+  return not ZorlenX_inRaidOrDungeon()
+end
+
+function ZorlenX_inRaidOrDungeon()
+  return (LazyPig_Raid() or LazyPig_Dungeon())
+end
+
 function ZorlenX_PlayerIsLeader()
   local leader = LazyPigMultibox_ReturnLeaderUnit()
   return (leader and UnitIsUnit("player", leader))
@@ -272,7 +271,7 @@ function ZorlenX_PetAttack()
 end
 
 function isDruidInGroup()
-	return ZorlenX_classInGroup("DRUID")
+  return ZorlenX_classInGroup("DRUID")
 end
 
 function isTroll()
@@ -280,41 +279,41 @@ function isTroll()
 end
 
 function isHunterInGroup()
-	return ZorlenX_classInGroup("HUNTER") 
+  return ZorlenX_classInGroup("HUNTER") 
 end
 
 function isPaladinInGroup()
-	return ZorlenX_classInGroup("PALADIN") 
+  return ZorlenX_classInGroup("PALADIN") 
 end
 
 function isPriestInGroup()
-	return ZorlenX_classInGroup("PRIEST") 
+  return ZorlenX_classInGroup("PRIEST") 
 end
 
 function isMageInGroup()
-	return ZorlenX_classInGroup("MAGE") 
+  return ZorlenX_classInGroup("MAGE") 
 end
 
 function isRogueInGroup()
-	return ZorlenX_classInGroup("ROGUE") 
+  return ZorlenX_classInGroup("ROGUE") 
 end
 
 function isShamanInGroup()
-	return ZorlenX_classInGroup("SHAMAN") 
+  return ZorlenX_classInGroup("SHAMAN") 
 end
 
 function isWarlockInGroup()
-	return ZorlenX_classInGroup("WARLOCK") 
+  return ZorlenX_classInGroup("WARLOCK") 
 end
 
 function isWarriorInGroup()
-	return ZorlenX_classInGroup("WARRIOR") 
+  return ZorlenX_classInGroup("WARRIOR") 
 end
 
 function ZorlenX_classInGroup(className)
   local counter = nil
   local u = nil
-  
+
   if UnitInRaid("player") then
     NumMembers = GetNumRaidMembers()
     counter = 1
@@ -338,20 +337,7 @@ end
 
 
 
--- Zorlen_MakeMacro(name, macro, percharacter, macroicontecture, iconindex, replace, show, nocreate, replacemacroindex, replacemacroname)
--- Zorlen_MakeMacro(LOCALIZATION_ZORLEN.EatMacroName, "/zorlen eat", 0, "Spell_Misc_Food", nil, 1, show)
--- /script ZorlenX_createMacros()
-function ZorlenX_createMacros()
-  local res = Zorlen_MakeMacro("1DPS", "/script ZorlenX_UseClassScript()", 0, "Ability_Druid_Maul", nil, 1,1)
-  ZorlenX_Debug(res)
-  Zorlen_MakeMacro("2DPS", "/script ZorlenX_UseClassScript()", 0, "Ability_Druid_Bash", nil, 1,1)
-  Zorlen_MakeMacro("3AOE", "/script ZorlenX_UseClassScript()" , 0, "Ability_Whirlwind", nil, 1,1)
-  Zorlen_MakeMacro("4OUT", "/script ZorlenX_OutOfCombat()"   , 0, "Spell_Misc_Drink", nil, 1,1)
-  Zorlen_MakeMacro("0FOL", "/script FollowLeader()"         , 0, "Ability_Rogue_Sprint", nil, 1,1)
-  Zorlen_MakeMacro("RELOADUI", "/console reloadui", 0, "Ability_Creature_Cursed_04", nil, 1, 1)
-  Zorlen_MakeMacro("LEADER", "/console LazyPigMultibox_MakeMeLeader()", 0, "Hunter_Sniper", nil, 1, 1)
 
-end
 
 ----------------- debug utilities -------
 function ZorlenX_Debug(value)
