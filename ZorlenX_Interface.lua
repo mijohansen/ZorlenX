@@ -8,7 +8,15 @@ function ZorlenX_EnsureMacroInBinding(targetBinding, name, command, texture)
     ZorlenX_Log("Error creating Macro")
   end
 end
-
+-- /script ZorlenX_ConfigureAddons()
+function ZorlenX_ConfigureAddons()
+  local aux = require 'aux'; 
+  local tooltip_settings = aux.character_data'tooltip';
+  tooltip_settings.value = true
+  tooltip_settings.merchant_buy = true 
+  tooltip_settings.disenchant_value = true 
+  tooltip_settings.disenchant_distribution = true 
+end
 -- /script ZorlenX_InitInterface()
 -- /script DisableAddOn("pfQuest")
 function ZorlenX_InitInterface()
@@ -18,7 +26,12 @@ function ZorlenX_InitInterface()
   ZorlenX_EnsureMacroInBinding(63,"AOE",    "ZorlenX_DpsAoe()",         "Ability_Whirlwind")
   ZorlenX_EnsureMacroInBinding(64,"AOEx",   "ZorlenX_DpsAoeBurst()",    "Ability_Whirlwind")
   ZorlenX_EnsureMacroInBinding(65,"PANIC",  "ZorlenX_DpsPanic()",       "Ability_Druid_Cower")
-  
+
+  ZorlenX_EnsureMacroInBinding(1,"DPS",    "ZorlenX_DpsSingle()",      "Ability_Druid_Maul")
+  ZorlenX_EnsureMacroInBinding(2,"DPSx",   "ZorlenX_DpsSingleBurst()", "Ability_Druid_Bash")
+  ZorlenX_EnsureMacroInBinding(3,"AOE",    "ZorlenX_DpsAoe()",         "Ability_Whirlwind")
+  ZorlenX_EnsureMacroInBinding(4,"AOEx",   "ZorlenX_DpsAoeBurst()",    "Ability_Whirlwind")
+  ZorlenX_EnsureMacroInBinding(5,"PANIC",  "ZorlenX_DpsPanic()",       "Ability_Druid_Cower")
   --other
   ZorlenX_EnsureMacroInBinding(10,"OOC",    "ZorlenX_OutOfCombat()",          "Spell_Misc_Drink")
   ZorlenX_EnsureMacroInBinding(70,"OOC",    "ZorlenX_OutOfCombat()",          "Spell_Misc_Drink")

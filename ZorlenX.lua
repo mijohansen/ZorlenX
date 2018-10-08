@@ -4,9 +4,14 @@
 @TODO
 * TopMeOff functionalitey into the addon: https://github.com/Bergador/TopMeOff/blob/master/TopMeOff.lua
 * Autotrade from Master to Slaves. Slaves will allways have full stacks of stuff.
-* 
-Berserking should pop at some point. 
-
+* Need a real immune mob list. create from database
+* Berserking should pop at some point for trolls
+* autouse of mana potions based on combat situation.
+* evocation and other mana+ stuff dont need to be used when total enemy HP is below player HP
+* Voidwalker should try to taunt enemies attacking cloth.
+* Need macro to count AOE-situations.
+* macrocreate need to also place icons.
+* Need combat strategies (heavy melee: ) / (Heavy Magic)
 ]]
 
 function ZorlenX_OnLoad()
@@ -15,6 +20,7 @@ function ZorlenX_OnLoad()
   this:RegisterEvent("ADDON_LOADED")
   this:RegisterEvent("PLAYER_LOGIN")
   this:RegisterEvent("CHAT_MSG_ADDON")
+  this:RegisterEvent("PARTY_MEMBERS_CHANGED")
 end
 
 function ZorlenX_OnEvent(event)
@@ -28,6 +34,10 @@ function ZorlenX_OnEvent(event)
   if(event == "ADDON_LOADED") then
     --just ensure that macros are created.
     -- ZorlenX_Log("Updating macros")
+  end
+  if(event == "PARTY_MEMBERS_CHANGED") then
+    ZorlenX_Log("Party Members changed, updating stuff..")
+
   end
   sheepSafe:OnEvent(event)
 end
@@ -80,12 +90,12 @@ function ZorlenX_UseClassScript(aoe, burst, panic)
   if not ZorlenX_TimeLock("ZorlenX_UseClassScript" , 0.5) then
     return false
   end
-  
+
   if not LPMULTIBOX.STATUS then
     ZorlenX_Log("LPMULTIBOX is turned off.")
     return
   end
-  
+
   local dps = LPMULTIBOX.SCRIPT_DPS
   local dps_pet = LPMULTIBOX.SCRIPT_DPSPET
   local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
@@ -97,25 +107,34 @@ function ZorlenX_UseClassScript(aoe, burst, panic)
     SitOrStand()
   end
 
-  if Zorlen_HealthPercent("player") < 25 and useHealthstone() then
+  if isTroll() and Zorlen_HealthPercent("player") < 25 and castBerserking() then
     return true
   end
+
   -- spesific function for when casting evaluating target etc.
   -- We will not change target unless player is idle
-  if Zorlen_isCasting() and UnitExists("target") and Zorlen_isEnemy("target") then
+  if UnitExists("target") and Zorlen_isEnemy("target") then
     if Zorlen_isBreakOnDamageCC("target") or UnitIsDeadOrGhost("target") then
-      SpellStopCasting()
-      ZorlenX_Log("Tried to stop spell due to bad target.")
+      backOffTarget()
+      ZorlenX_Log("Tried to back off target.")
     end
   end
 
   if not Zorlen_isCastingOrChanneling() then
     -- added support for Decursive, just running the script when not Channeling or casting
-    if not panic and Dcr_Clean(false,false) then
+    if Zorlen_HealthPercent("player") < 25 and Zorlen_inCombat() and useHealthstone() then
+      return true
+    end
+
+    if heal and Zorlen_ManaPercent("player") < 20 and useManaPotion() then
+      return true
+    end
+
+    if not panic and ZorlenX_TimeLock("DcrCleanTimeLock" , 1.5) and Dcr_Clean(false,false) then
       ZorlenX_Log("Tried to decursive.")
       return
     end
-    
+
     -- added support for SheepSafe, just running the script when not Channeling or casting
     -- this should also stop casting... CC is more important, or is it?
     if not aoe and isSlave and ZorlenX_ccAbleTargetExists() and ZorlenX_SheepSafeUntargeted() then
@@ -173,15 +192,15 @@ function ZorlenX_OutOfCombat()
   end
 
   if ZorlenX_DruidEnsureCasterForm() then
-    ZorlenX_Log("Ensuring Caster Form for druid", LPMULTIBOX)
+    ZorlenX_Log("Ensuring Caster Form for druid")
     return true
   end
 
   -- casting doesnt affect trade. just trade!
   -- need to toggle so that concurrency never happens.
-  if ZorlenX_Toggle("OutOfCombatToggler") or ZorlenX_OrderDrinks() then
+  if isMageInGroup() and ZorlenX_Toggle("OutOfCombatToggler") or ZorlenX_OrderDrinks() then
     ZorlenX_Log("Ordering Drinks")
-  elseif ZorlenX_OrderHealthstone() then
+  elseif isWarlockInGroup() and ZorlenX_OrderHealthstone() then
     ZorlenX_Log("Ordering Healthstone")
   end
 
@@ -326,7 +345,7 @@ function ZorlenX_classInGroup(className)
 
   while counter <= NumMembers do
     local unit = groupType .. "" .. counter
-    if Zorlen_isClass(className, unit) then
+    if Zorlen_isClass(className, unit) and CheckInteractDistance(unit,2) then
       return true
     end
     counter = counter + 1
@@ -335,10 +354,21 @@ function ZorlenX_classInGroup(className)
 end
 
 
+function playerHaveManaPotion()
+  local manaitems = { 
+    2455,	-- Minor Mana Potion
+    3385,	-- Lesser Mana Potion
+    3827,	-- Mana Potion
+    6149,	-- Greater Mana Potion
+    13443,	-- Superior Mana Potion
+    13444,	-- Major Mana Potion
+  }
+end
 
-
-
-
+function useManaPotion()
+  ZorlenX_Log("Would use mana potion. Function need to be implemented.")
+  return false
+end
 ----------------- debug utilities -------
 function ZorlenX_Debug(value)
   DEFAULT_CHAT_FRAME:AddMessage("---")
@@ -346,9 +376,12 @@ function ZorlenX_Debug(value)
 end
 
 function ZorlenX_Log(msg,value)
-  local playerTargetName = UnitName("target")
-  if not playerTargetName then
-    playerTargetName = "<Unknown>"
+  local playerTargetName = "<NoTarget>"
+  if UnitExists("target") then
+    local targetName = UnitName("target")
+    if targetName then
+      playerTargetName = targetName
+    end
   end
   ChatFrame3:AddMessage("[" .. playerTargetName .. "]" .. msg,to_string(value))
 end

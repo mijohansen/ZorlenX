@@ -24,9 +24,12 @@ BINDING_HEADER_SheepSafe = "SheepSafe";	BINDING_NAME_SheepSafeCombo =
 -- Visual Pretargetting	with Detect Magic for mages by Faithkills
 --   (have framework for other classes but not sure what appropriate spell for it is)
 
+
+-- @TODO use Zorlens Action Bar scanner.
+
 sheepSafe = {}
 sheepSafe.version = "2.1.3b"
-sheepSafe.ccSlot = nil
+sheepSafe.ccSlot = nil --can be removed
 sheepSafe.notificationSent = {}
 sheepSafe.preTargetSpellCast = false
 sheepSafe.inCombat = false
@@ -60,15 +63,15 @@ sheepSafe.dots["Spell_Nature_Cyclone"] = true
 sheepSafe.dots["Spell_Nature_InsectSwarm"] = true
 sheepSafe.dots["Spell_Shadow_Requiem"] = true
 
-sheepSafe.ccs =	{}
-sheepSafe.ccs["Spell_Nature_Polymorph"]	= true
-sheepSafe.ccs["Ability_Sap"] = true
-sheepSafe.ccs["Spell_Frost_ChainsOfIce"] = true	
-sheepSafe.ccs["Spell_Nature_Slow"] = true
-sheepSafe.ccs["Spell_Nature_Sleep"] = true
-sheepSafe.ccs["Spell_Shadow_Cripple"] =	true
-sheepSafe.ccs["Spell_Shadow_MindSteal"]	= true
-sheepSafe.ccs["Ability_GolemStormBolt"]	= true
+--sheepSafe.ccs =	{}
+--sheepSafe.ccs["Spell_Nature_Polymorph"]	= true
+--sheepSafe.ccs["Ability_Sap"] = true
+--sheepSafe.ccs["Spell_Frost_ChainsOfIce"] = true	
+--sheepSafe.ccs["Spell_Nature_Slow"] = true
+--sheepSafe.ccs["Spell_Nature_Sleep"] = true
+--sheepSafe.ccs["Spell_Shadow_Cripple"] =	true
+--sheepSafe.ccs["Spell_Shadow_MindSteal"]	= true
+--sheepSafe.ccs["Ability_GolemStormBolt"]	= true
 
 sheepSafe.molestVerbs = {}
 sheepSafe.molestVerbs["hits"] = "hit"
@@ -128,9 +131,9 @@ function sheepSafe:OnEvent()
       end
     end
     self:SetClassDefaults()
-    if self.ccicon then
-      self:ScanActionBar()
-    end
+--    if self.ccicon then
+--      self:ScanActionBar()
+--    end
 
   elseif (event == "PLAYER_LEAVING_WORLD") then
     this:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
@@ -145,8 +148,8 @@ function sheepSafe:OnEvent()
         this:UnregisterEvent(evnt)
       end
     end
-  elseif (event == "ACTIONBAR_SLOT_CHANGED") then
-    sheepSafe:ScanActionBar()
+--  elseif (event == "ACTIONBAR_SLOT_CHANGED") then
+--    sheepSafe:ScanActionBar()
   elseif (event == "PLAYER_TARGET_CHANGED") then
     self.notificationSent =	{}
     self.preTargetSpellCast	= false
@@ -206,13 +209,13 @@ function sheepSafe:SheepSafe()
   if self == nil then
     self = sheepSafe
   end
-  
+
   if not Zorlen_IsSpellKnown(self.cc) then
     ZorlenX_Log("Spell "..self.cc.." is unknown. Aborting.")
     return false
   end
 
-  if self.ccSlot == nil then
+  if ZorlenX_getMyCCSlot() == nil then
     ZorlenX_Log("Can't find "..self.cc.." on your action bar.	Please	add it.")
     return false
   end
@@ -244,24 +247,24 @@ function sheepSafe:SheepSafe()
     return false
   end
 
-  local isUsable, notEnoughMana = IsUsableAction(self.ccSlot)
+  local isUsable, notEnoughMana = IsUsableAction(ZorlenX_getMyCCSlot())
   if (isUsable	~= 1) then
     ZorlenX_Log(self.cc.." not ready.")
     return false
   end
 
-  if (IsActionInRange(self.ccSlot) == 0) then
+  if (IsActionInRange(ZorlenX_getMyCCSlot()) == 0) then
     ZorlenX_Log(self.cc.." not in range.")
     return false
   end
 
-  local start,	duration, enable = GetActionCooldown(self.ccSlot)
+  local start, duration, enable = GetActionCooldown(ZorlenX_getMyCCSlot())
   if (duration	~= 0) then
-    ZorlenX_Log(self.cc.." not ready,	in cooldown.")
+    ZorlenX_Log(self.cc .. " not ready,	on cooldown.")
     return false
   end
 
-  sheepSafe:d("pretarget:"..sheepSafe:BtoS(sheepSafeConfig.pretarget).." incombat:"..sheepSafe:BtoS(self.inCombat))
+  ZorlenX_Log("pretarget:"..sheepSafe:BtoS(sheepSafeConfig.pretarget).." incombat:"..sheepSafe:BtoS(self.inCombat))
   local tmpp =	sheepSafe:nilSafe(self.preTargetSpell)
   if tmpp then
     ZorlenX_Log("pretarget spell: "..tmpp)
@@ -273,23 +276,14 @@ function sheepSafe:SheepSafe()
     self.preTargetSpellCast	= true
     return false
   end
-
   local message = "#### "..self.ccverb1.." "..UnitName("target").." ("..UnitHealth("target").."% health"
   local targetTarget =	UnitName("targettarget")
   if (targetTarget) then
     message =	message..", attacking "..targetTarget
   end
   message = message..")"
-
-  sheepSafe:p(message)
-  UseAction(self.ccSlot)
-
-  if sheepSafeConfig.warning then
-    sheepSafe:NotifyPotentialSheepBreakers()
-    sheepSafe.scheduler.Schedule(.5, self.PeriodicCheckWhileCasting)
-  end
-
-  return true
+  ZorlenX_Log(message)
+  return Zorlen_castSpellByName(self.cc)
 end
 
 SheepSafe = sheepSafe.SheepSafe
@@ -352,31 +346,32 @@ end
 function sheepSafe:PeriodicCheckWhileCasting()
   --sheepSafe.d("Re-checking potential	sheep breakers")
   sheepSafe:NotifyPotentialSheepBreakers()
-  if (IsCurrentAction(sheepSafe.ccSlot)) then
+  if (IsCurrentAction(ZorlenX_getMyCCSlot())) then
     sheepSafe.scheduler.Schedule(.5,	sheepSafe.PeriodicCheckWhileCasting)
   end
 end
 
-function sheepSafe:ScanActionBar()
-  sheepSafe.ccSlot = nil
-  if not self.ccicon then
-    return
-  end
-  sheepSafe:d("rescanning action bar...")
-  local slot
-  for slot=1, 120, 1 do 
-    if (not GetActionText(slot)) then	-- ignore any Player macros :-)
-      local text = GetActionTexture(slot)
-      if (text) then
-        if (string.find(text, self.ccicon))	then 
-          sheepSafe:d("found "..self.cc.." at slot "..slot)
-          self.ccSlot = slot
-          break
-        end
-      end
-    end
-  end
-end
+--can be removed
+--function sheepSafe:ScanActionBar()
+--  sheepSafe.ccSlot = nil
+--  if not self.ccicon then
+--    return
+--  end
+--  sheepSafe:d("rescanning action bar...")
+--  local slot
+--  for slot=1, 120, 1 do 
+--    if (not GetActionText(slot)) then	-- ignore any Player macros :-)
+--      local text = GetActionTexture(slot)
+--      if (text) then
+--        if (string.find(text, self.ccicon))	then 
+--          sheepSafe:d("found "..self.cc.." at slot "..slot)
+--          self.ccSlot = slot
+--          break
+--        end
+--      end
+--    end
+--  end
+--end
 
 -- Scheduler
 -- We hook the PlayerFrame_OnUpdate function, which gets called	every frame
@@ -650,6 +645,10 @@ function sheepSafe:findSheepee(ar)
   return tsheepee
 end
 
+function ZorlenX_getMyCCSlot()
+  local zSpellname = sheepSafe.cc .. ".Any"
+  return Zorlen_Button[zSpellname]
+end
 function sheepSafe:SetClassDefaults()
   -- setting some defaults that can be used later
   if sheepSafeConfig.toggle == nil then

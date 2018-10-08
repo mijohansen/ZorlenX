@@ -12,17 +12,23 @@ function ZorlenX_Mage(dps, dps_pet, heal, aoe, burst, panic, isSlave)
   if ZorlenX_MageOnLowManaEvocation() then
     return true
   end
+  --/script castManaShield()
+  if Zorlen_HealthPercent("player") < 50 and COMBAT_SCANNER.enemiesAggroPlayer > 0 and castManaShield() then
+    return true
+  end
+  -- kill enemies attacking casters? 
+--  if targetEnemyAttackingCasters() then
+--    if not Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) --then
+--      return true
+--    else
+--      ZorlenX_Log("Failed to deal with enemy targeting casters.")
+--    end
+--  end
   
-  --if targetEnemyAttackingCasters() then
-    --hurling a rank 1 frostbolt.
-    --if not Zorlen_checkDebuffByName(LOCALIZATION_ZORLEN.Frostbolt, "target") and castFrostbolt(1) --then
-      --return true
-    --else
-      --ZorlenX_Log("Failed to deal with enemy targeting casters.")
-    --end
-  --end
-  
-  -- we need to do some smart targeting here. For now. AssistMasterOrFirst and best.
+  if aoe and (COMBAT_SCANNER.enemiesInAoeRange > 3) and castArcaneExplosion() then
+    return true
+  end
+  -- we need to do some smart targeting here. For now. AssistMasterOrFirst and best. Targeting is complete here.
   if ((aoe and targetHighestHP()) or targetMainTarget()) and ZorlenX_MageDPS() then
     return true
   end
@@ -46,14 +52,15 @@ function ZorlenX_MageOnLowManaEvocation()
   if not Zorlen_IsSpellKnown("Evocation") or Zorlen_isMoving() or not Zorlen_inCombat() then
     return false
   end
-  if Zorlen_ManaPercent("player") < 10 and Zorlen_checkCooldownByName("Evocation") then
+  if Zorlen_ManaPercent("player") < 5 and Zorlen_checkCooldownByName("Evocation") then
     return Zorlen_castSpellByName("Evocation")
   end
   return false
 end
-
+-- /script ZorlenX_Debug(LOCALIZATION_ZORLEN.ImprovedMarkOfTheWild)
+-- 
 function ZorlenX_MageSmartScorch()
-  if Zorlen_isDieingEnemy() or not Zorlen_IsSpellKnown("Scorch") then
+  if Zorlen_isDieingEnemy() or not Zorlen_IsSpellKnown(LOCALIZATION_ZORLEN.Scorch) then
     return false
   end
   local scorch_stack = Zorlen_GetDebuffStack("Spell_Fire_SoulBurn", "target")
@@ -81,16 +88,16 @@ function ZorlenX_MageDPS()
   if Zorlen_isImmune("Fireball", "target") and castFrostbolt() then
     return true
   end
-  
+  if castFireBlast() then
+    return true
+  end
   if ZorlenX_MageSmartScorch() then
     return true
   end
   if ZorlenX_MageCombustion() then
     return true
   end
-  if castFireBlast() then
-    return true
-  end
+
 
   if castFireball() then
     return true
@@ -169,4 +176,15 @@ function ZorlenX_MageConjure()
     return true
   end
   return false
+end
+
+
+function castManaShield(SpellRank, test)
+	local z = {}
+	z.Rank = SpellRank
+	z.Test = test
+	z.SpellName = LOCALIZATION_ZORLEN.ManaShield
+	z.EnemyTargetNotNeeded = 1
+	z.BuffName = z.SpellName
+	return Zorlen_CastCommonRegisteredSpell(z)
 end

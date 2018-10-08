@@ -6,19 +6,14 @@ local unique_judgement = "Judgement of Wisdom"
 
 
 function ZorlenX_Paladin(dps, dps_pet, heal, aoe, burst, panic, isSlave)
-	local locked = Zorlen_isChanneling() or Zorlen_isCasting()
-	
-	if locked  then
+  
+	if Zorlen_isCastingOrChanneling()  then
 		return true
 	end
   
-
-  
 	if LazyPigMultibox_SmartSkillPaladin() then 
-		return
+		return true
 	end
-	
-
 	
 	if heal and QuickHeal() then
     TargetUnit("playertarget") --trying to fix overheal issue by reselecting the player target
@@ -32,16 +27,20 @@ function ZorlenX_Paladin(dps, dps_pet, heal, aoe, burst, panic, isSlave)
 		return
 	end
 
-	if dps then
-		castAttack()
-	else
-		stopAttack()
-	end
-	
-  if ZorlenX_SealWisdom() then
-    return true
+	--if dps then
+	--	castAttack()
+	--else
+	--	stopAttack()
+	--end
+  if targetMainTarget() then
+    castAttack()
+    if ZorlenX_WisdomJudgement() then
+      ZorlenX_Log("Doing Seal of wisdom.")
+      return true
+    end
+  else
+    stopAttack()
   end
-
 end
 
 function LazyPigMultibox_MultiSeal(dmg)
@@ -55,12 +54,9 @@ function LazyPigMultibox_MultiSeal(dmg)
 end
 
 function ZorlenX_SealWisdom()
-  local target_hp = MobHealth_GetTargetCurHP()
-  if not target_hp then
-    target_hp = 0
-  end
+  local target_hp = ZorlenX_GetTargetCurHP()
   local player_hp = UnitHealthMax("player")
-	if Zorlen_isEnemy("target") and target_hp > 1.5 * player_hp then 
+	if Zorlen_isEnemy("target") and isSealActive() and target_hp > 1.5 * player_hp then 
 		local judgement_range = LazyPigMultibox_IsSpellInRangeAndActionBar("Judgement")
     local judged = Zorlen_checkDebuffByName("Judgement of Wisdom", "target")
     if not judged and isSealActive() and Zorlen_checkCooldownByName("Judgement") then

@@ -35,9 +35,10 @@ function ZorlenX_Warlock(dps, dps_pet, heal, aoe, burst, panic, isSlave)
 
 
 
-  if targetMainTarget() and dps_pet then
-    ZorlenX_PetAttack()
+  if dps_pet then
     Warlock_PetSuffering()
+  else
+    
   end
 
   if not panic and not aoe and targetEnemyAttackingCasters() then
@@ -52,26 +53,21 @@ function ZorlenX_Warlock(dps, dps_pet, heal, aoe, burst, panic, isSlave)
     end
   end
 
-  if not aoe and dps and targetMainTarget() and LazyPigMultibox_WarlockDPS(unique_curse) then
+  if not aoe and dps and targetMainTarget() and ZorlenX_WarlockDPS(lpm_warlock_curse) then
+    ZorlenX_PetAttack()
     return true
   end
 
   if aoe and dps and ZorlenX_WarlockAoe() then
+    ZorlenX_PetAttack()
     return true
   end
+
   -- if we have dotted all targets, focus on killing the one with highest HP
-  if aoe and dps and targetHighestHP() and LazyPigMultibox_WarlockDPS(LOCALIZATION_ZORLEN.CurseOfAgony) then
+  if aoe and dps and targetHighestHP() and ZorlenX_WarlockDPS(nil) then
     return true
   end
-  
-  if not isCorruption() and Zorlen_castSpellByName("Corruption") then
-    return true
-  end
-  
-  -- target will allways be master at this point. Ensure that dots are up on master target.
-  if not isImmolate() and castImmolate() then
-    return true
-  end
+
   if Zorlen_ManaPercent("player") < 70 and Zorlen_HealthPercent("player") > 75 and castLifeTap() then
     return
   end	
@@ -93,82 +89,69 @@ function fearIsApplied()
   return ZorlenX_ccIsApplied("Spell_Shadow_Possession")
 end 
 
-function LazyPigMultibox_WarlockDPS(curse)
-
+function isHardMob()
+  return (UnitClassification("target") == "elite") or (UnitClassification("target") == "rareelite")	or (UnitClassification("target") == "worldboss")	
+end
+function ZorlenX_WarlockDPS(curse)
   local player_mana_percent = (UnitMana("player") / UnitManaMax("player")) * 100
   local player_hp_percent = (UnitHealth("player") / UnitHealthMax("player")) * 100
-
-  --if Zorlen_isEnemy() then	--or UnitAffectingCombat("target")
-  local hard_mob = (UnitClassification("target") == "elite") or (UnitClassification("target") == "rareelite")	or (UnitClassification("target") == "worldboss")	
+  local hard_mob = isHardMob()
   local dot_unit = hard_mob or player_mana_percent <= 100 or UnitIsPlayer("target")
   local drainok = Zorlen_IsSpellKnown("Drain Life") and LazyPigMultibox_IsSpellInRangeAndActionBar("Drain Life")
-  local target_hp = MobHealth_GetTargetCurHP()
-  if not target_hp then
-    target_hp = 0
-  end
-  if Zorlen_isDieingEnemy("target") and LazyPigMultibox_WarlockFinisher() then
+  local target_hp = ZorlenX_GetTargetCurHP()
+  local targetImmuneToShadow = immuneToShadow()
+
+  -- all spells that are finishers are shadow...
+  if not targetImmuneToShadow and Zorlen_isDieingEnemy("target") and LazyPigMultibox_WarlockFinisher() then
     return true
   end 
   if player_mana_percent <= 25 and player_hp_percent >= 65 and castLifeTap() then
     return true
-  elseif Zorlen_checkBuffByName("Shadow Trance", "player") and castShadowBolt() then
-    return true	
-  elseif not isCorruption() and Zorlen_castSpellByName("Corruption") then
-    return true 	
-  elseif player_mana_percent > 25 and (player_hp_percent > 60 or not drainok) then
-    if(dot_unit or moving and UnitAffectingCombat("target")) then
-      if curse and target_hp > UnitHealthMax("player") and not Zorlen_checkDebuffByName(lpm_warlock_curse,"target") and Zorlen_castSpellByName(lpm_warlock_curse) then
-        return true
-      elseif not curse and (UnitHealthMax("target") > 2*UnitHealthMax("player") or Zorlen_isEnemyPlayer("target")) and castAmplifyCurse() then
-        return true
-      elseif not curse and castCurseOfAgony() then
-        return true
-      elseif dot_unit and castSiphonLife() then
-        return true
-      end	
+  end
+  if not targetImmuneToShadow then
+    if Zorlen_checkBuffByName("Shadow Trance", "player")  and castShadowBolt() then
+      return true	
+    elseif not isCorruption() and castCorruption() then
+      return true 	
+    elseif player_mana_percent > 25 and (player_hp_percent > 60 or not drainok) then
+      if(dot_unit or moving and UnitAffectingCombat("target")) then
+        if curse and target_hp > UnitHealthMax("player") and not Zorlen_checkDebuffByName(lpm_warlock_curse,"target") and Zorlen_castSpellByName(lpm_warlock_curse) then
+          return true
+        elseif not curse and (UnitHealthMax("target") > 2*UnitHealthMax("player") or Zorlen_isEnemyPlayer("target")) and castAmplifyCurse() then
+          return true
+        elseif not curse and castCurseOfAgony() then
+          return true
+        elseif dot_unit and castSiphonLife() then
+          return true
+        end	
+      end
     end
+  end
+  if lpm_firelock and not Zorlen_isDieingEnemy("target") and castConflagrate() then 
+    return true
+  end
 
-    if lpm_firelock and not Zorlen_isDieingEnemy("target") and castConflagrate() then 
+  if lpm_firelock and Zorlen_HealthPercent("target") < 50 and castSearingPain() then 
+    return true
+  end
+
+  if not isImmolate() and castImmolate() then
+    return true
+  end
+
+  if not Zorlen_isMoving() and not targetImmuneToShadow then
+    if castShadowBolt() then
       return true
     end
 
-    if lpm_firelock and Zorlen_HealthPercent("target") < 50 and castSearingPain() then 
-      return true
+    if not Zorlen_IsTimer("DLOCK") and drainok and castDrainLife() then 
+      Zorlen_SetTimer(2, "DLOCK")
+      return				
     end
-
-    if not isImmolate() and castImmolate() then
-      return true
-    end
-
-    if not Zorlen_isMoving() and castShadowBolt() then
-      --
-    end
-
-  elseif not Zorlen_isMoving() and not Zorlen_IsTimer("DLOCK") and drainok and castDrainLife() then 
-    Zorlen_SetTimer(2, "DLOCK")
-    return				
-  elseif not Zorlen_isMoving() and castLifeTap() then 
-    -- Nok: so we just cast lifetap when standing still?
-    return	
-  end	
-
-  --end
-
+  end
+  
 end
 
-
-function LazyPigMultibox_WarlockBuff()
-  if LPMULTIBOX.SCRIPT_BUFF then	
-    local leader = LazyPigMultibox_ReturnLeaderUnit()
-    if UnitExists(leader) and not UnitIsDead(leader) and CheckInteractDistance(leader, 4) and Zorlen_IsSpellKnown("Detect Greater Invisibility") and not Zorlen_checkBuffByName("Detect Greater Invisibility", leader) then
-      TargetUnit(leader);
-      return Zorlen_castSpellByName("Detect Greater Invisibility");
-    else
-      --
-    end
-  end	
-  return
-end
 
 function LazyPigMultibox_WarlockPet(pet)
   function SummonMinion()
@@ -214,9 +197,7 @@ function LazyPigMultibox_WarlockFinisher()
   if not UnitAffectingCombat("player") or not UnitExists("target") then
     return
   end
-
   local player_hp_percent = (UnitHealth("player") / UnitHealthMax("player")) * 100
-
   local shard_maxcount = LazyPigMultibox_SetShardBagSize()
   local shard_count = Zorlen_GiveSoulShardCount()
   local enemy_player = Zorlen_isEnemyPlayer()
@@ -291,4 +272,12 @@ function useHealthstone()
   if healthstoneName and Zorlen_useContainerItemByName(healthstoneName) then
     return true  
   end
+end
+
+ZORLENX_IMMUNETOSHADOW = {}
+ZORLENX_IMMUNETOSHADOW["Shadowfang Darksoul"] = true
+
+function immuneToShadow()
+  local name = UnitName("target")
+  return ZORLENX_IMMUNETOSHADOW[name]
 end

@@ -6,6 +6,11 @@ function ZorlenX_Priest(dps, dps_pet, heal, aoe, burst, panic, isSlave)
 
   local shadow_form = Zorlen_checkBuffByName("Shadowform", "player")
 
+  -- just use inner fire on low mana.
+  if Zorlen_ManaPercent("player") < 30 and castInnerFocus() then
+    return true
+  end
+  
   if heal and not shadow_form then
     local result = QuickHeal()
     if Zorlen_isCasting() then
@@ -13,18 +18,24 @@ function ZorlenX_Priest(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       return
     end
   end
-
+  
+  if castInnerFire() then
+    ZorlenX_Log("Aquiring InnerFire.")
+    return
+  end
+  
+  if isTroll() and castShadowguard() then
+    ZorlenX_Log("Aquiring ShadowGuard.")
+    return 
+  end
+  
   if not heal and not shadow_form and Zorlen_castSpellByName("Shadowform") then
     ZorlenX_Log("Aquiring ShadowForm.")
     return
 
-  elseif castInnerFire() then
-    ZorlenX_Log("Aquiring InnerFire.")
-    return
-
-  elseif UnitAffectingCombat("player") and (Zorlen_isEnemyTargetingYou("target") or Zorlen_HealthPercent("player") < 50) and (LazyPig_Raid() or LazyPig_Dungeon() or Zorlen_HealthPercent("player") < 75) and (Zorlen_checkCooldownByName("Fade") or Zorlen_checkCooldownByName("Power Word: Shield") or Zorlen_checkCooldownByName("Stoneform")) then 
+  elseif UnitAffectingCombat("player") and (Zorlen_isEnemyTargetingYou("target") or Zorlen_HealthPercent("player") < 50) and (ZorlenX_inRaidOrDungeon() or Zorlen_HealthPercent("player") < 75) and (Zorlen_checkCooldownByName("Fade") or Zorlen_checkCooldownByName(LOCALIZATION_ZORLEN.PowerWordShield) or Zorlen_checkCooldownByName("Stoneform")) then 
     if Zorlen_isCasting() then 
-      SpellStopCasting();
+      SpellStopCasting()
       return 
     elseif isShootActive() then
       stopShoot()
@@ -34,23 +45,54 @@ function ZorlenX_Priest(dps, dps_pet, heal, aoe, burst, panic, isSlave)
     end
   end	
 
+  -- targeting logic is broken...
   if dps and targetMainTarget() and ZorlenX_PriestDps() then
     ZorlenX_Log("Used ZorlenX_PriestDps.")
     return true
-  elseif isTroll() and isRareTarget() and not isHexOfWeakness("target") and castHexOfWeakness() then
-    return true
-  elseif heal and not isShootActive() and targetLowestHP() then
-    -- just do some extra Wanding when in healmode
-    ZorlenX_Log("Starting to use wand on target with lowest HP.")
-    castShoot()
-  else
-    ZorlenX_Log("No suitable action found.")
   end
+
+-- /script ZorlenX_Debug(TargetUnit("party2"))
+  local CS = ZorlenX_CombatScan()
+  -- Fortitude casters with aggro
+  
+  if 
+  CS.castersWithAggroCount > 0 and 
+  powerWordShieldReady() 
+  then
+     
+    for i, casterWithAggroName in pairs(CS.castersWithAggro) do
+      local unit = LazyPigMultibox_ReturnUnit(casterWithAggroName)
+      ZorlenX_Log("Checking " .. unit .. " with aggro to help...")
+      if Zorlen_HealthPercent(unit) < 70 and not isWeakenedSoul(unit) and not isPowerWordShield(unit) and (TargetUnit(unit) or castPowerWordShield()) then
+        return true
+      end
+    end
+  end
+-- /script castShadowguard()
+  -- cast fear when
+  if panic then
+  
+  end
+
+  if targetMainTarget() then
+    if isTroll() and isRareTarget() and not isHexOfWeakness("target") and castHexOfWeakness() then
+      return true
+    end
+    if heal and not isShootActive() then
+      -- just do some extra Wanding when in healmode
+      ZorlenX_Log("Starting to use wand on target.")
+      castShoot()
+    end
+  end
+  ZorlenX_Log("No suitable action found.")
 end
+
+
 function isRareTarget()
   local target_type = UnitClassification("target")
   return (target_type == "elite" or target_type == "rareelite" or target_type == "worldboss")
 end
+
 function ZorlenX_PriestDps()
   --local plague_stack = Zorlen_GetDebuffStack("Spell_Shadow_BlackPlague", "target")
   local plague_stack = 5
@@ -59,13 +101,13 @@ function ZorlenX_PriestDps()
   local hi_mana = Zorlen_ManaPercent("player") > 20
   local inner_active = Zorlen_checkBuffByName("Inner Focus", "player")
   local target_hp = MobHealth_GetTargetCurHP()
-  local target_type = UnitClassification("target")
-  local rare_target = (target_type == "elite" or target_type == "rareelite" or target_type == "worldboss")
+  local rare_target = isRareTarget()
   local shadow_form = Zorlen_checkBuffByName("Shadowform", "player")
   if not target_hp then
     target_hp = 0
   end
-  if COMBAT_SCANNER.totemExists and Zorlen_TargetTotem() then
+  if COMBAT_SCANNER.totemExists then
+    Zorlen_TargetTotem()
     ZorlenX_Log("Targeting Totem for destruction")
     if not isShootActive() then
       castShoot()
@@ -115,4 +157,15 @@ function ZorlenX_PriestDps()
     castShoot();
     return true
   end
+end
+
+function powerWordShieldReady()
+  return Zorlen_checkCooldownByName(LOCALIZATION_ZORLEN.PowerWordShield)
+end
+
+function castInnerFocus() 
+	local SpellName = LOCALIZATION_ZORLEN.InnerFocus
+	local EnemyTargetNotNeeded = 1
+	local BuffName = SpellName
+	return Zorlen_CastCommonRegisteredSpell(SpellRank, SpellName, nil, nil, nil, nil, EnemyTargetNotNeeded, BuffName)
 end

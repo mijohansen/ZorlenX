@@ -4,12 +4,12 @@ C:\Projects\WoW\Bin\Interface\FrameXML\UI.xsd">
 	<Script file="ZorlenX_CombatScanner.lua"/>
 	<Script file="ZorlenX_SheepSafe.lua"/>
 	<Script file="ZorlenX_Trader.lua"/>
-  <Script file="ZorlenX_Interface.lua"/>
-  <Script file="ZorlenX_Druid.lua"/>
-  <Script file="ZorlenX_Mage.lua"/>
-  <Script file="ZorlenX_Paladin.lua"/>
-  <Script file="ZorlenX_Priest.lua"/>
-  <Script file="ZorlenX_Warlock.lua"/>
+	<Script file="ZorlenX_Interface.lua"/>
+	<Script file="ZorlenX_Druid.lua"/>
+	<Script file="ZorlenX_Mage.lua"/>
+	<Script file="ZorlenX_Paladin.lua"/>
+	<Script file="ZorlenX_Priest.lua"/>
+	<Script file="ZorlenX_Warlock.lua"/>
 	<Frame name="ZorlenX_Frame">
     <Scripts>
       <OnLoad>

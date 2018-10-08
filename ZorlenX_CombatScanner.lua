@@ -58,7 +58,9 @@ function ZorlenX_CombatScan()
   local enemyScanRounds = {}
 
   -- creating CC-targets
-  COMBAT_SCANNER.ccsApplied[sheepSafe.ccicon] = false
+  if sheepSafe.ccicon then
+    COMBAT_SCANNER.ccsApplied[sheepSafe.ccicon] = false
+  end
   if isWarlock("player") then
     COMBAT_SCANNER.ccsApplied["Spell_Shadow_Possession"] = false
   end
@@ -72,7 +74,6 @@ function ZorlenX_CombatScan()
     end
     COMBAT_SCANNER.scanIterations = i 
     local currentTargetFingerprint = ZorlenX_CurrentTargetFingerPrint()
-    local targetIsCrowdControlled = false
     local targetIsActiveEnemy = Zorlen_isActiveEnemy("target")
     local currentTargetHealth = UnitHealth("target")
     local currentTargetHealthAbs = ZorlenX_GetTargetCurHP()
@@ -88,19 +89,7 @@ function ZorlenX_CombatScan()
     if enemyScanRounds[currentTargetFingerprint] == 2 and (COMBAT_SCANNER.lastTarget == currentTargetFingerprint or not COMBAT_SCANNER.lastTarget)  then
       break
     end
-    -- determines the CCed targets we have..
-    -- doing it just once pr scan pr target.
-    -- this should probably do some smarter caching in the future as we do extensive calls to UnitDebuff() which could be done once pr target.
-    if not enemyScanRounds[currentTargetFingerprint] then
-      targetIsCrowdControlled = Zorlen_isBreakOnDamageCC("target")
-      if targetIsCrowdControlled then
-        for ccSpellname, applied in pairs(COMBAT_SCANNER.ccsApplied) do
-          if Zorlen_checkDebuff(ccSpellname, "target" ) then
-            COMBAT_SCANNER.ccsApplied[ccSpellname] = true
-          end
-        end
-      end
-    end
+
 
     if ZorlenX_IsTotem("target") then
       COMBAT_SCANNER.totemExists = true
@@ -109,16 +98,28 @@ function ZorlenX_CombatScan()
     if Zorlen_isEnemyTargetingYou() then
       enemiesAggroPlayer[currentTargetFingerprint] = 1
     end
-
-    if targetIsActiveEnemy and not targetIsCrowdControlled then
-      if not activeLooseEnemies[currentTargetFingerprint] and ZorlenX_isUnitCCable("target") then
-        ZorlenX_Log("Target is ccAble.")
-        COMBAT_SCANNER.ccAbleTargetExists = true
-        COMBAT_SCANNER.ccAbleTargetName = ZorlenX_CurrentTargetName()
+    
+    if enemyScanRounds[currentTargetFingerprint] == 0 then
+      if targetIsActiveEnemy then
+        if ZorlenX_isUnitCCable("target") then
+          ZorlenX_Log("Target is ccAble.")
+          COMBAT_SCANNER.ccAbleTargetExists = true
+          COMBAT_SCANNER.ccAbleTargetName = ZorlenX_CurrentTargetName()
+        end
+        activeLooseEnemies[currentTargetFingerprint] = 1
+      else
+        -- determines the CCed targets we have..
+        -- doing it just once pr scan pr target.
+        -- this should probably do some smarter caching in the future as we do extensive calls to UnitDebuff() which could be done once pr target.
+        -- need also check for banish...
+        for ccSpellname, applied in pairs(COMBAT_SCANNER.ccsApplied) do
+          if Zorlen_checkDebuff(ccSpellname, "target" ) then
+            COMBAT_SCANNER.ccsApplied[ccSpellname] = true
+          end
+        end
       end
-      activeLooseEnemies[currentTargetFingerprint] = 1
     end
-
+    
     if targetIsActiveEnemy and UnitExists("targettarget") and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
       enemyesAggroingCasters[currentTargetFingerprint] = true
       castersWithAggro[UnitName("targettarget")] = true
@@ -134,7 +135,7 @@ function ZorlenX_CombatScan()
     end
 
     -- health targeting
-    if targetIsActiveEnemy and not targetIsCrowdControlled and currentTargetHealthAbs then
+    if targetIsActiveEnemy and currentTargetHealthAbs then
       if not COMBAT_SCANNER.highestHealth or currentTargetHealthAbs > COMBAT_SCANNER.highestHealth then
         COMBAT_SCANNER.highestHealth = currentTargetHealthAbs
         COMBAT_SCANNER.highestHealthName = ZorlenX_CurrentTargetName()
@@ -161,10 +162,9 @@ function ZorlenX_CombatScan()
   COMBAT_SCANNER.scanTime              = round(GetTime() - scanStart, 4)
   COMBAT_SCANNER.activeEnemies         = table_length(activeEnemiesHp) 
   COMBAT_SCANNER.totalEnemyHP          = table_sum(activeEnemiesHp) 
-  COMBAT_SCANNER.myCCApplied           = ZorlenX_myCcIsApplied()
+  COMBAT_SCANNER.myCCApplied           = COMBAT_SCANNER.ccsApplied[sheepSafe.ccicon]
 
   ZorlenX_UpdateCombatFrame()
-
   return COMBAT_SCANNER
 end
 
@@ -400,7 +400,7 @@ function ZorlenX_isUnitCCable(unit)
     return false
   end
   local targetCreatureType = UnitCreatureType("target")
-  if creaturetype and not string.find(sheepSafe.validtargets, targetCreatureType) then
+  if targetCreatureType and not string.find(sheepSafe.validtargets, targetCreatureType) then
     return false
   end
 
@@ -409,7 +409,7 @@ function ZorlenX_isUnitCCable(unit)
     return false
   end
 
-  if Zorlen_isBreakOnDamageCC("target") then
+  if Zorlen_isCrowedControlled("target") then
     return false
   end
 
