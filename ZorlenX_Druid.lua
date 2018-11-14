@@ -5,14 +5,12 @@ function ZorlenX_Druid(dps, dps_pet, heal, aoe, burst, panic, isSlave)
   local moonkin_form = isMoonkinForm()
   local isTank = true
   if Zorlen_isCastingOrChanneling() then
-    return true
+    return false
   end
 
-  if heal and not cat_form and not bear_form and not moonkin_form then
+  if heal and isCasterForm() then
     QuickHeal()
   end
-  
-
   
   if dps then
     if isTank and ZorlenX_AttackBear(aoe) then
@@ -28,7 +26,7 @@ function ZorlenX_Druid(dps, dps_pet, heal, aoe, burst, panic, isSlave)
 end
 
 function ZorlenX_DruidEnsureCasterForm()
-  if isDireBearForm() and CastSpellByName(LOCALIZATION_ZORLEN.DireBearForm)then
+  if isDireBearForm() and CastSpellByName(LOCALIZATION_ZORLEN.DireBearForm) then
     return true
   end
   if isBearForm() and CastSpellByName(LOCALIZATION_ZORLEN.BearForm) then
@@ -67,7 +65,7 @@ function ZorlenX_AttackBear(aoe)
     end
     if not Zorlen_isEnemyTargetingYou() and Zorlen_checkCooldownByName("Growl") and not Zorlen_isEnemyPlayer("target") and UnitExists("targettarget") and Zorlen_castSpellByName("Growl") then 
       return true
-    elseif castDemoralizingRoar() then
+    elseif CheckInteractDistance("target",2) and castDemoralizingRoar() then
       return true
     elseif aoe and castSwipe() then
       return true

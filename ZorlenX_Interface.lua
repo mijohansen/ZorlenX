@@ -51,5 +51,7 @@ function ZorlenX_createMacros()
   Zorlen_MakeMacro("0FOL", "/script FollowLeader()"         , 0, "Ability_Rogue_Sprint", nil, 1,1)
   Zorlen_MakeMacro("RELOADUI", "/console reloadui", 0, "Ability_Creature_Cursed_04", nil, 1, 1)
   Zorlen_MakeMacro("LEADER", "/console LazyPigMultibox_MakeMeLeader()", 0, "Hunter_Sniper", nil, 1, 1)
-
 end
+
+-- /script ZorlenX_Debug(SMARTBUFF_Buffs["PartyX"]["Thorns"]["HUNTER"])
+-- SMARTBUFF_Buffs["Party"]["Thorns"]["WPET"] = true

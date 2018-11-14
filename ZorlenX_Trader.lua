@@ -71,7 +71,7 @@ function ZorlenX_OrderHealthstone()
     return false
   end
 
-  if healthstoneExists() then
+  if playerHaveHealthstone() then
     return false
   end
   ZorlenX_Log("Request healthstone mofos!")
@@ -80,7 +80,7 @@ function ZorlenX_OrderHealthstone()
 end
 
 function ZorlenX_ServeHealthstone(player_name)
-  local healthstoneName = healthstoneExists()
+  local healthstoneName = playerHaveHealthstone()
   if isWarlock("player") and healthstoneName then
     local water_name = ZorlenX_MageWaterName()
     ZorlenX_PickupContainerItemByName(healthstoneName)

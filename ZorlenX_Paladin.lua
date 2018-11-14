@@ -32,7 +32,7 @@ function ZorlenX_Paladin(dps, dps_pet, heal, aoe, burst, panic, isSlave)
 	--else
 	--	stopAttack()
 	--end
-  if targetMainTarget() then
+  if targetMainTarget(isSlave) then
     castAttack()
     if ZorlenX_WisdomJudgement() then
       ZorlenX_Log("Doing Seal of wisdom.")

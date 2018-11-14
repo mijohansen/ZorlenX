@@ -29,7 +29,7 @@ function ZorlenX_Mage(dps, dps_pet, heal, aoe, burst, panic, isSlave)
     return true
   end
   -- we need to do some smart targeting here. For now. AssistMasterOrFirst and best. Targeting is complete here.
-  if ((aoe and targetHighestHP()) or targetMainTarget()) and ZorlenX_MageDPS() then
+  if ((aoe and targetHighestHP()) or targetMainTarget(isSlave)) and ZorlenX_MageDPS() then
     return true
   end
   
@@ -166,7 +166,11 @@ function ZorlenX_MageConjure()
   if Zorlen_ManaPercent("player") < 25 then
     return false
   end
-  if isMage("player") and ZorlenX_MageWaterCount() < 60 and Zorlen_castSpellByName("Conjure Water") then 
+  local amount = 60
+  if ZorlenX_isOutside() then
+    amount = 140
+  end
+  if isMage("player") and ZorlenX_MageWaterCount() < amount and Zorlen_castSpellByName("Conjure Water") then 
     return true
   end
   if Zorlen_IsSpellKnown("Conjure Mana Jade") and not manaJadeExists() and Zorlen_castSpellByName("Conjure Mana Jade") then 

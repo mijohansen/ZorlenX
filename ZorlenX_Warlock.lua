@@ -6,59 +6,70 @@ local lpm_shard_bag = nil
 
 -- Fire Lock
 local lpm_pet = "Imp"
-local lpm_warlock_curse = "Curse of the Elements"
 local lpm_firelock = true
 
 function ZorlenX_Warlock(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+  --ZorlenX_Debug({dps, dps_pet, heal, aoe, burst, panic, isSlave})
   local manapercent = UnitMana("player") / UnitManaMax("player")
   local healthpercent = UnitHealth("player") / UnitHealthMax("player")
   local player_affected = UnitAffectingCombat("player")
   local unique_curse = nil
 
+  if isMageInGroup() or (isGrouped() and lpm_firelock) then
+    local lpm_warlock_curse = LOCALIZATION_ZORLEN.CurseOfTheElements
+  elseif isGrouped() then
+    local lpm_warlock_curse = LOCALIZATION_ZORLEN.CurseOfShadow
+  else
+    local lpm_warlock_curse = LOCALIZATION_ZORLEN.CurseOfAgony
+  end
   if LPMULTIBOX.UNIQUE_SPELL and Zorlen_IsSpellKnown(lpm_warlock_curse) then
     unique_curse = true
   end
   -- this seem to not happen... Why?
-  if not panic and dps_pet then
+  if not panic and not aoe and dps_pet then
     -- this spell only summons.
     LazyPigMultibox_WarlockPet(lpm_pet)
   end	
 
   if UnitAffectingCombat("player") and Zorlen_HealthPercent("player") < 15 and LazyPigMultibox_IsPetSpellKnown("Sacrifice") and not Zorlen_checkBuffByName("Sacrifice", "player") and not Zorlen_checkBuffByName("Blessing of Protection", "player") then
     zSacrifice();
-    LazyPigMultibox_Annouce("lpm_slaveannouce","Sacrifice");
+    if isSlave then
+      LazyPigMultibox_Annouce("lpm_slaveannouce","Sacrifice");
+    end
   end
 
   if Zorlen_isCastingOrChanneling() then
     return true
   end
 
-
-
   if dps_pet then
     Warlock_PetSuffering()
-  else
-    
   end
 
-  if not panic and not aoe and targetEnemyAttackingCasters() then
-    if COMBAT_SCANNER.looseEnemies > 1 
-    and CheckInteractDistance("target", 2) 
-    and not Zorlen_isDieingEnemy("target") 
+  local CS = ZorlenX_CombatScan()
+  if (CS.looseEnemies > 1 or not isGrouped()) and not panic and not aoe and targetEnemyAttackingCasters() then
+    if (CheckInteractDistance("target", 2) and not Zorlen_isDieingEnemy("target") or not isGrouped())
     and ((not fearIsApplied() and castFear()) or castDeathCoil()) then
+      ZorlenX_PetAttack()
+      ZorlenX_Log("Trying to deal with enemies attacking casters.")
       return true
-    else
-      -- targeting function is run, we go back to assist on Master target.
-      ZorlenX_Log("Failed to deal with enemy targeting casters.")
     end
   end
 
-  if not aoe and dps and targetMainTarget() and ZorlenX_WarlockDPS(lpm_warlock_curse) then
+  -- Just do a scream in chaotic situations.
+  if not aoe and ZorlenX_shouldDoMassFear() and castHowlOfTerror() then
+    ZorlenX_Log("Doing mass fear...")
+    return
+  end
+
+  if not aoe and dps and targetMainTarget(isSlave) and ZorlenX_WarlockDPS(lpm_warlock_curse) then
+    ZorlenX_Log("Doing normal ZorlenX_WarlockDPS")
     ZorlenX_PetAttack()
     return true
   end
 
   if aoe and dps and ZorlenX_WarlockAoe() then
+    ZorlenX_Log("Doing ZorlenX_WarlockAoe")
     ZorlenX_PetAttack()
     return true
   end
@@ -73,6 +84,7 @@ function ZorlenX_Warlock(dps, dps_pet, heal, aoe, burst, panic, isSlave)
   end	
 
 end
+
 
 -- /script ZorlenX_WarlockAoe()
 
@@ -130,8 +142,8 @@ function ZorlenX_WarlockDPS(curse)
   if lpm_firelock and not Zorlen_isDieingEnemy("target") and castConflagrate() then 
     return true
   end
-
-  if lpm_firelock and Zorlen_HealthPercent("target") < 50 and castSearingPain() then 
+  
+  if isGrouped() and lpm_firelock and Zorlen_HealthPercent("target") < 50 and castSearingPain() then 
     return true
   end
 
@@ -149,7 +161,7 @@ function ZorlenX_WarlockDPS(curse)
       return				
     end
   end
-  
+
 end
 
 
@@ -228,7 +240,7 @@ function ZorlenX_CreateHealthStone()
     return false
   end
 
-  if healthstoneExists() then
+  if playerHaveHealthstone() then
     return false
   end
 
@@ -249,30 +261,7 @@ function ZorlenX_CreateHealthStone()
     end
   end
 end 
---should be common functions
-function healthstoneExists()
-  local healthstoneNames =  {
-    "Minor Healthstone",
-    "Lesser Healthstone",
-    "Healthstone",
-    "Greater Healthstone",
-    "Major Healthstone"
-  }
-  local existingHealthstoneName = false
-  for i, healthstoneName in ipairs(healthstoneNames) do
-    if Zorlen_GiveContainerItemCountByName(healthstoneName) == 1 then
-      existingHealthstoneName = healthstoneName
-    end
-  end
-  return existingHealthstoneName
-end
 
-function useHealthstone()
-  local healthstoneName = healthstoneExists()
-  if healthstoneName and Zorlen_useContainerItemByName(healthstoneName) then
-    return true  
-  end
-end
 
 ZORLENX_IMMUNETOSHADOW = {}
 ZORLENX_IMMUNETOSHADOW["Shadowfang Darksoul"] = true

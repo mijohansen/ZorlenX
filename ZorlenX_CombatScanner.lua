@@ -1,26 +1,26 @@
 COMBAT_SCANNER = {}
 
 function ZorlenX_resetCombatScanner()
-  COMBAT_SCANNER.scanTime = 0
-  COMBAT_SCANNER.scanIterations = 0
-  COMBAT_SCANNER.lastTarget = false
-  COMBAT_SCANNER.looseEnemies = 0
   COMBAT_SCANNER.activeEnemies = 0
-  COMBAT_SCANNER.totalEnemyHP = 0
   COMBAT_SCANNER.castersWithAggroCount = 0
-  COMBAT_SCANNER.myCCApplied = false
-  COMBAT_SCANNER.highestHealth = false
-  COMBAT_SCANNER.lowestHealth = false
-  COMBAT_SCANNER.isBossFight = false
-  COMBAT_SCANNER.totemExists = false
+  COMBAT_SCANNER.ccAbleTargetExists = false
+  COMBAT_SCANNER.ccAbleTargetName = false
+  COMBAT_SCANNER.ccsApplied = {}
   COMBAT_SCANNER.enemiesAggroPlayer = 0
   COMBAT_SCANNER.enemiesInAoeRange = 0
-  COMBAT_SCANNER.ccAbleTargetExists = false
-  COMBAT_SCANNER.ccsApplied = {}
-  COMBAT_SCANNER.ccAbleTargetName = false
   COMBAT_SCANNER.enemyAggroingCasterName  = false
+  COMBAT_SCANNER.highestHealth = false
   COMBAT_SCANNER.highestHealthName = false
+  COMBAT_SCANNER.isBossFight = false
+  COMBAT_SCANNER.lastTarget = false
+  COMBAT_SCANNER.looseEnemies = 0
+  COMBAT_SCANNER.lowestHealth = false
   COMBAT_SCANNER.lowestHealthName = false
+  COMBAT_SCANNER.myCCApplied = false
+  COMBAT_SCANNER.scanIterations = 0
+  COMBAT_SCANNER.scanTime = 0
+  COMBAT_SCANNER.totalEnemyHP = 0
+  COMBAT_SCANNER.totemExists = false
   return COMBAT_SCANNER
 end
 
@@ -48,14 +48,14 @@ function ZorlenX_CombatScan()
   -- resetting values
   ZorlenX_resetCombatScanner()
   --defining some locals
-  local activeLooseEnemies = {}
-  local enemiesAggroPlayer = {}
-  local castersWithAggro = {}
-  local enemyesAggroingCasters = {}
-  local enemiesInAoeRange = {}
-  local scanStart = GetTime()
   local activeEnemiesHp = {}
+  local activeLooseEnemies = {}
+  local castersWithAggro = {}
+  local enemiesAggroPlayer = {}
+  local enemiesInAoeRange = {}
   local enemyScanRounds = {}
+  local enemyesAggroingCasters = {}
+  local scanStart = GetTime()
 
   -- creating CC-targets
   if sheepSafe.ccicon then
@@ -72,7 +72,7 @@ function ZorlenX_CombatScan()
     if not UnitExists("target") then
       break
     end
-    COMBAT_SCANNER.scanIterations = i 
+
     local currentTargetFingerprint = ZorlenX_CurrentTargetFingerPrint()
     local targetIsActiveEnemy = Zorlen_isActiveEnemy("target")
     local currentTargetHealth = UnitHealth("target")
@@ -86,10 +86,12 @@ function ZorlenX_CombatScan()
     end
 
     -- break iteration if we have the original target and we are seeing it for the second time
-    if enemyScanRounds[currentTargetFingerprint] == 2 and (COMBAT_SCANNER.lastTarget == currentTargetFingerprint or not COMBAT_SCANNER.lastTarget)  then
+    if enemyScanRounds[currentTargetFingerprint] == 2 and (COMBAT_SCANNER.lastTarget == currentTargetFingerprint or not COMBAT_SCANNER.lastTarget) then
       break
     end
 
+    -- her regner vi iterasjonen som startet.
+    COMBAT_SCANNER.scanIterations = i 
 
     if ZorlenX_IsTotem("target") then
       COMBAT_SCANNER.totemExists = true
@@ -98,7 +100,7 @@ function ZorlenX_CombatScan()
     if Zorlen_isEnemyTargetingYou() then
       enemiesAggroPlayer[currentTargetFingerprint] = 1
     end
-    
+
     if enemyScanRounds[currentTargetFingerprint] == 0 then
       if targetIsActiveEnemy then
         if ZorlenX_isUnitCCable("target") then
@@ -113,13 +115,13 @@ function ZorlenX_CombatScan()
         -- this should probably do some smarter caching in the future as we do extensive calls to UnitDebuff() which could be done once pr target.
         -- need also check for banish...
         for ccSpellname, applied in pairs(COMBAT_SCANNER.ccsApplied) do
-          if Zorlen_checkDebuff(ccSpellname, "target" ) then
+          if ZorlenX_targetIsValidForMyCC(ccSpellname) and Zorlen_checkDebuff(ccSpellname, "target" ) then
             COMBAT_SCANNER.ccsApplied[ccSpellname] = true
           end
         end
       end
     end
-    
+
     if targetIsActiveEnemy and UnitExists("targettarget") and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
       enemyesAggroingCasters[currentTargetFingerprint] = true
       castersWithAggro[UnitName("targettarget")] = true
@@ -154,15 +156,15 @@ function ZorlenX_CombatScan()
     enemyScanRounds[currentTargetFingerprint] = enemyScanRounds[currentTargetFingerprint] + 1
   end
   -- counting active loose enemies++
-  COMBAT_SCANNER.looseEnemies          = table_length(activeLooseEnemies)
-  COMBAT_SCANNER.enemiesAggroPlayer    = table_length(enemiesAggroPlayer)
+  COMBAT_SCANNER.activeEnemies         = table_length(activeEnemiesHp) 
   COMBAT_SCANNER.castersWithAggro      = table_keys(castersWithAggro)
   COMBAT_SCANNER.castersWithAggroCount = table_length(castersWithAggro)
+  COMBAT_SCANNER.enemiesAggroPlayer    = table_length(enemiesAggroPlayer)
   COMBAT_SCANNER.enemiesInAoeRange     = table_length(enemiesInAoeRange) 
-  COMBAT_SCANNER.scanTime              = round(GetTime() - scanStart, 4)
-  COMBAT_SCANNER.activeEnemies         = table_length(activeEnemiesHp) 
-  COMBAT_SCANNER.totalEnemyHP          = table_sum(activeEnemiesHp) 
+  COMBAT_SCANNER.looseEnemies          = table_length(activeLooseEnemies)
   COMBAT_SCANNER.myCCApplied           = COMBAT_SCANNER.ccsApplied[sheepSafe.ccicon]
+  COMBAT_SCANNER.scanTime              = round(GetTime() - scanStart, 4)
+  COMBAT_SCANNER.totalEnemyHP          = table_sum(activeEnemiesHp) 
 
   ZorlenX_UpdateCombatFrame()
   return COMBAT_SCANNER
@@ -171,6 +173,11 @@ end
 function ZorlenX_ccIsApplied(cc_spellname)
   local CS = ZorlenX_CombatScan()
   return CS.ccsApplied[cc_spellname]
+end
+
+function ZorlenX_shouldDoMassFear()
+  local CS = ZorlenX_CombatScan()
+  return (CS.castersWithAggroCount > 2) and (CS.enemiesInAoeRange > 3)
 end
 
 function ZorlenX_ccAbleTargetExists()
@@ -191,6 +198,9 @@ end
 function targetAndEnsureDots(dotSpells)
   -- first doing a check to ensure that there is something to dot.
   -- no need to dot shit that is dead.
+  if ZorlenX_TimeLock("targetAndEnsureDots",1.5) then
+    return false
+  end
   local CS = ZorlenX_CombatScan()
   local minimumDottableHp = UnitHealthMax("player") * 0.5
   if not CS.highestHealth or (CS.highestHealth < minimumDottableHp) then
@@ -201,7 +211,7 @@ function targetAndEnsureDots(dotSpells)
   local workingDotSpells = {}
   for i, dotSpellname in pairs(dotSpells) do
     local zSpellname = dotSpellname .. ".Any"
-    if Zorlen_Button[zSpellname] and Zorlen_IsSpellKnown(dotSpellname) then
+    if Zorlen_Button[zSpellname] then
       workingDotSpells[dotSpellname] = true
     else
       if not Zorlen_Button[zSpellname] and Zorlen_IsSpellKnown(dotSpells) then
@@ -211,7 +221,7 @@ function targetAndEnsureDots(dotSpells)
   end
   local scannedTargets = {}
   local duplicateScans = 0 
-  for i = 1, 8 do
+  for i = 1, 4 do
     TargetNearestEnemy()
     if not UnitExists("target") then
       break
@@ -221,15 +231,16 @@ function targetAndEnsureDots(dotSpells)
     if scannedTargets[currentTargetFingerprint] then
       duplicateScans = duplicateScans + 1
     end
-    if duplicateScans > 2 then
+    if duplicateScans == 2 then
       break
     end
     if Zorlen_isActiveEnemy("target") and currentTargetHealthAbs > minimumDottableHp then
       for dotSpellname, spellIsOk in pairs(workingDotSpells) do
         if spellIsOk and 
         isActionInRangeAndUsable(dotSpellname) and 
-        not Zorlen_checkDebuffByName(dotSpellname, "target" ) and 
+        not Zorlen_checkDebuffByName(dotSpellname, "target") and 
         Zorlen_castSpellByName(dotSpellname) then
+          ZorlenX_Log("Dotted with " .. dotSpellname .. " as part of the AOE-rutine.")
           return true
         end 
       end
@@ -249,35 +260,36 @@ end
 
 function targetLowestHP()
   local CS = ZorlenX_CombatScan()
-  if not CS.lowestHealth then
-    return false
-  end
-  for i = 1, 6 do
-    TargetNearestEnemy()
-    if not UnitExists("target") then
-      break
-    end
-    if 
-    CS.lowestHealthName == ZorlenX_CurrentTargetName() and 
-    Zorlen_isActiveEnemy("target") and 
-    not Zorlen_isBreakOnDamageCC("target") then
-      return true
-    end
-  end
+  return targetEnemyByName(CS.lowestHealthName)
 end
 
 function targetHighestHP()
   local CS = ZorlenX_CombatScan()
-  if not CS.highestHealth then
+  return targetEnemyByName(CS.highestHealthName)
+end
+
+function targetEnemyAttackingCasters()
+  local CS = ZorlenX_CombatScan()
+  if not (CS.castersWithAggroCount > 0) then
     return false
   end
-  for i = 1, 6 do
+  return targetEnemyByName(CS.enemyAggroingCasterName)
+end
+
+function targetEnemyByName(enemyName)
+  if not enemyName then
+    return false
+  end
+  if UnitExists("target") and enemyName == ZorlenX_CurrentTargetName() then
+    return true
+  end
+  local preTargetFingerPrint = ZorlenX_CurrentTargetFingerPrint()
+  for i = 1, 4 do
     TargetNearestEnemy()
-    if not UnitExists("target") then
+    if not UnitExists("target") or preTargetFingerPrint == ZorlenX_CurrentTargetFingerPrint() then
       break
     end
-    if
-    CS.highestHealthName == ZorlenX_CurrentTargetName() and 
+    if enemyName == ZorlenX_CurrentTargetName() and 
     Zorlen_isActiveEnemy("target") and 
     not Zorlen_isBreakOnDamageCC("target") then
       return true
@@ -287,7 +299,7 @@ end
 
 -- will target the first target that have a friendly target as target
 function targetFallbackTarget()
-  for i = 1, 6 do
+  for i = 1, 3 do
     TargetNearestEnemy()
     if not UnitExists("target") then
       break
@@ -299,8 +311,10 @@ function targetFallbackTarget()
   end
 end
 
-function targetMainTarget()
-  LazyPigMultibox_AssistMaster()
+function targetMainTarget(isSlave)
+  if isSlave then
+    LazyPigMultibox_AssistMaster()
+  end
   if not Zorlen_isActiveEnemy("target") then
     if ZorlenX_inRaidOrDungeon() and targetLowestHP() then
       return true
@@ -325,7 +339,7 @@ function targetEnemyAttackingMe()
   if not (CS.enemiesAggroPlayer > 0) then
     return false
   end
-  for i = 1, 6 do
+  for i = 1, 4 do
     TargetNearestEnemy()
     if Zorlen_isEnemyTargetingYou() then
       return true
@@ -333,18 +347,7 @@ function targetEnemyAttackingMe()
   end
 end
 
-function targetEnemyAttackingCasters()
-  local CS = ZorlenX_CombatScan()
-  if not (CS.castersWithAggroCount > 0) then
-    return false
-  end
-  for i = 1, 6 do
-    TargetNearestEnemy()
-    if Zorlen_isActiveEnemy() and UnitIsFriend("player","targettarget") and isSoftTarget("targettarget") then
-      return true
-    end
-  end
-end
+
 
 function targetBoss()
   local CS = ZorlenX_CombatScan()
@@ -359,8 +362,8 @@ function targetBoss()
   end
 end
 
-function ZorlenX_FindUntargetedTarget()
 
+function ZorlenX_FindUntargetedTarget()
   if not sheepSafeConfig.toggle then
     return false
   end
@@ -370,7 +373,7 @@ function ZorlenX_FindUntargetedTarget()
     ZorlenX_Log("Aborting: I have a cc already.");
     return false
   end
-  local CS = ZorlenX_CombatScan()
+
   if not ZorlenX_ccAbleTargetExists() then
     ZorlenX_Log("No CCable target exists. Aborting CC.");
     return false
@@ -390,6 +393,16 @@ function ZorlenX_FindUntargetedTarget()
   end
 end
 
+--/script ZorlenX_Debug(UnitCreatureType("target"))
+function ZorlenX_targetIsValidForMyCC(spell)
+  local targetCreatureType = UnitCreatureType("target")
+  if spell == "Spell_Shadow_Possession" then
+    return (targetCreatureType ~= "Undead")
+  else
+    return (targetCreatureType and string.find(sheepSafe.validtargets, targetCreatureType))
+  end
+end
+
 function ZorlenX_isUnitCCable(unit) 
   if ZorlenX_mobIsBoss("target") then
     return false
@@ -399,8 +412,8 @@ function ZorlenX_isUnitCCable(unit)
   if Zorlen_HealthPercent("target") < 75  then
     return false
   end
-  local targetCreatureType = UnitCreatureType("target")
-  if targetCreatureType and not string.find(sheepSafe.validtargets, targetCreatureType) then
+
+  if not ZorlenX_targetIsValidForMyCC() then
     return false
   end
 
@@ -442,27 +455,27 @@ function ZorlenX_IsTotem(unit)
   end
   local targetName = UnitName(unit)
   local t = {
-    [LOCALIZATION_ZORLEN.GreaterHealingWard] = true,
-    [LOCALIZATION_ZORLEN.LavaSpoutTotem] = true,
-    [LOCALIZATION_ZORLEN.TremorTotem] = true,
     [LOCALIZATION_ZORLEN.EarthbindTotem] = true,
-    [LOCALIZATION_ZORLEN.HealingStreamTotem] = true,
-    [LOCALIZATION_ZORLEN.ManaTideTotem] = true,
-    [LOCALIZATION_ZORLEN.ManaSpringTotem] = true,
-    [LOCALIZATION_ZORLEN.SearingTotem] = true,
-    [LOCALIZATION_ZORLEN.MagmaTotem] = true,
     [LOCALIZATION_ZORLEN.FireNovaTotem] = true,
-    [LOCALIZATION_ZORLEN.GroundingTotem] = true,
-    [LOCALIZATION_ZORLEN.WindfuryTotem] = true,
-    [LOCALIZATION_ZORLEN.FlametongueTotem] = true,
-    [LOCALIZATION_ZORLEN.StrengthOfEarthTotem] = true,
-    [LOCALIZATION_ZORLEN.GraceOfAirTotem] = true,
-    [LOCALIZATION_ZORLEN.StoneskinTotem] = true,
-    [LOCALIZATION_ZORLEN.WindwallTotem] = true,
     [LOCALIZATION_ZORLEN.FireResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.FlametongueTotem] = true,
     [LOCALIZATION_ZORLEN.FrostResistanceTotem] = true,
+    [LOCALIZATION_ZORLEN.GraceOfAirTotem] = true,
+    [LOCALIZATION_ZORLEN.GreaterHealingWard] = true,
+    [LOCALIZATION_ZORLEN.GroundingTotem] = true,
+    [LOCALIZATION_ZORLEN.HealingStreamTotem] = true,
+    [LOCALIZATION_ZORLEN.LavaSpoutTotem] = true,
+    [LOCALIZATION_ZORLEN.MagmaTotem] = true,
+    [LOCALIZATION_ZORLEN.ManaSpringTotem] = true,
+    [LOCALIZATION_ZORLEN.ManaTideTotem] = true,
     [LOCALIZATION_ZORLEN.NatureResistanceTotem] = true,
-    [LOCALIZATION_ZORLEN.PoisonCleansingTotem] = true
+    [LOCALIZATION_ZORLEN.PoisonCleansingTotem] = true,
+    [LOCALIZATION_ZORLEN.SearingTotem] = true,
+    [LOCALIZATION_ZORLEN.StoneskinTotem] = true,
+    [LOCALIZATION_ZORLEN.StrengthOfEarthTotem] = true,
+    [LOCALIZATION_ZORLEN.TremorTotem] = true,
+    [LOCALIZATION_ZORLEN.WindfuryTotem] = true,
+    [LOCALIZATION_ZORLEN.WindwallTotem] = true,
   }
   return t[targetName]
 end

@@ -1,16 +1,11 @@
 --[[
-
-
 @TODO
 * TopMeOff functionalitey into the addon: https://github.com/Bergador/TopMeOff/blob/master/TopMeOff.lua
 * Autotrade from Master to Slaves. Slaves will allways have full stacks of stuff.
 * Need a real immune mob list. create from database
 * Berserking should pop at some point for trolls
-* autouse of mana potions based on combat situation.
 * evocation and other mana+ stuff dont need to be used when total enemy HP is below player HP
 * Voidwalker should try to taunt enemies attacking cloth.
-* Need macro to count AOE-situations.
-* macrocreate need to also place icons.
 * Need combat strategies (heavy melee: ) / (Heavy Magic)
 ]]
 
@@ -51,38 +46,26 @@ function ZorlenX_MessageReceiver(mode, message, sender)
   end 
 end
 
-
-function isSoftTarget(unit)
-  if isMage(unit) or isWarlock(unit) or isPriest(unit) or isHunter(unit) or isRogue(unit) then
-    return true
-  end
-  if isDruid(unit) and not isBearForm(unit) then
-    return true
-  end
-  return false
-end
-
--- Eventhough I can count active enemies there will be need to solve for
--- CC etc.
+-- COMBAT FUNCTIONS
 
 function ZorlenX_DpsSingle()
-  return ZorlenX_UseClassScript(false,false)
+  return ZorlenX_UseClassScript(false, false)
 end
 
 function ZorlenX_DpsSingleBurst()
-  return ZorlenX_UseClassScript(false,true)
+  return ZorlenX_UseClassScript(false, true)
 end
 
 function ZorlenX_DpsAoe()
-  return ZorlenX_UseClassScript(true,false)
+  return ZorlenX_UseClassScript(true, false)
 end
 
 function ZorlenX_DpsAoeBurst()
-  return ZorlenX_UseClassScript(true,true)
+  return ZorlenX_UseClassScript(true, true)
 end
 
 function ZorlenX_DpsPanic()
-  return ZorlenX_UseClassScript(false,false,true)
+  return ZorlenX_UseClassScript(false, false, true)
 end
 
 -- /script ZorlenX_UseClassScript()
@@ -99,20 +82,22 @@ function ZorlenX_UseClassScript(aoe, burst, panic)
   local dps = LPMULTIBOX.SCRIPT_DPS
   local dps_pet = LPMULTIBOX.SCRIPT_DPSPET
   local heal = LPMULTIBOX.SCRIPT_HEAL or LPMULTIBOX.SCRIPT_FASTHEAL
-  -- little trick to get slave status regardless of who is the party leader
-  local isSlave = true and IsControlKeyDown()
 
+  -- little trick to get slave status regardless of who is the party leader
+  local isSlave = (true and IsControlKeyDown())
+  burst = (true and burst)
+  panic = (true and panic)
   -- just to get up if we know you are drinking.
   if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
     SitOrStand()
   end
 
   if isTroll() and Zorlen_HealthPercent("player") < 25 and castBerserking() then
+    ZorlenX_Log("Tried to cast berserking.")
     return true
   end
 
   -- spesific function for when casting evaluating target etc.
-  -- We will not change target unless player is idle
   if UnitExists("target") and Zorlen_isEnemy("target") then
     if Zorlen_isBreakOnDamageCC("target") or UnitIsDeadOrGhost("target") then
       backOffTarget()
@@ -120,17 +105,27 @@ function ZorlenX_UseClassScript(aoe, burst, panic)
     end
   end
 
+  -- We will not change target unless player is idle
   if not Zorlen_isCastingOrChanneling() then
-    -- added support for Decursive, just running the script when not Channeling or casting
+    -- use health stone on low HP
     if Zorlen_HealthPercent("player") < 25 and Zorlen_inCombat() and useHealthstone() then
+      ZorlenX_Log("Tried to use health stone.")
       return true
     end
 
-    if heal and Zorlen_ManaPercent("player") < 20 and useManaPotion() then
+    -- healers use mana potions
+    if heal and playerIsManaUser() and Zorlen_ManaPercent("player") < 20 and Zorlen_inCombat() and useManaPotion() then
+      ZorlenX_Log("Tried to use mana potion.")
       return true
     end
 
-    if not panic and ZorlenX_TimeLock("DcrCleanTimeLock" , 1.5) and Dcr_Clean(false,false) then
+    -- other players use health potions
+    if not heal and Zorlen_HealthPercent("player") < 20 and Zorlen_inCombat() and useHealthPotion() then
+      ZorlenX_Log("Tried to use health potion.")
+      return true
+    end
+
+    if not panic and not (isDireBearForm() or isBearForm()) and ZorlenX_TimeLock("DcrCleanTimeLock" , 1.5) and Dcr_Clean(false,false) then
       ZorlenX_Log("Tried to decursive.")
       return
     end
@@ -142,12 +137,16 @@ function ZorlenX_UseClassScript(aoe, burst, panic)
       return 
     end
 
+    if not Zorlen_inCombat() and playerIsManaUser() and ZorlenX_OutOfCombat() then
+      ZorlenX_Log("Doing quick out of combat stuff")
+      return true
+    end
+    
     if dps or dps_pet or heal  then
-      dps = dps and ( isGrouped() or LPMULTIBOX.AM_ENEMY or Zorlen_isActiveEnemy("target") and (LPMULTIBOX.AM_ACTIVEENEMY and LPMULTIBOX.AM_ACTIVENPCENEMY))
       if isPaladin("player") then
         ZorlenX_Paladin(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       elseif isShaman("player") then
-        --ZorlenX_Shaman(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+        -- ZorlenX_Shaman(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       elseif isDruid("player") then
         ZorlenX_Druid(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       elseif isPriest("player") then
@@ -157,21 +156,22 @@ function ZorlenX_UseClassScript(aoe, burst, panic)
       elseif isMage("player") then
         ZorlenX_Mage(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       elseif isHunter("player") then
-        --ZorlenX_Hunter(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+        -- ZorlenX_Hunter(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       elseif isRogue("player") then
-        --ZorlenX_Rogue(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+        -- ZorlenX_Rogue(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       elseif isWarrior("player") then
-        --ZorlenX_Warrior(dps, dps_pet, heal, aoe, burst, panic, isSlave)
+        -- ZorlenX_Warrior(dps, dps_pet, heal, aoe, burst, panic, isSlave)
       end
-      return true
     end	
   end
 
   if LPMULTIBOX.FA_DISMOUNT and LazyPigMultibox_Dismount() then
+    ZorlenX_Log("Tried to Dismount")
     return 
   end
 
   if LazyPigMultibox_Schedule() or LazyPigMultibox_ScheduleSpell() then
+    ZorlenX_Log("Tried to cast LazyPigMultibox scheduled spell.")
     return
   end
 
@@ -179,12 +179,12 @@ function ZorlenX_UseClassScript(aoe, burst, panic)
 end
 
 
-
+-- OUT OF COMBAT RUN
 -- /script ZorlenX_OutOfCombat()
 function ZorlenX_OutOfCombat()
   -- Doing some spam avoide here.
   if ZorlenX_TimeLock("OutOfCombat", 1) then
-    return true
+    return false
   end
 
   if isDrinkingActive() and Zorlen_ManaPercent("player") == 100 then
@@ -206,47 +206,65 @@ function ZorlenX_OutOfCombat()
 
   if Zorlen_isCastingOrChanneling() or Zorlen_inCombat() then
     ZorlenX_Log("In Combat og already casting skipping.")
-    return
+    return true
   end
 
   if LPMULTIBOX.SCRIPT_REZ and not Zorlen_isMoving() and LazyPigMultibox_Rez() then
     ZorlenX_Log("Rezzing")
-    return 
+    return true 
   end
 
   if LPMULTIBOX.SCRIPT_BUFF and LazyPigMultibox_UnitBuff() then
     ZorlenX_Log("Buffing")
-    return
+    return true
   end
 
   if isWarlock("player")  and not Zorlen_isMoving() and LazyPigMultibox_SmartSS() then
     ZorlenX_Log("Creating Soulstone")
-    return
+    return true
   end
 
   if isWarlock("player")  and not Zorlen_isMoving() and ZorlenX_CreateHealthStone() then
     ZorlenX_Log("Creating Healthstone")
-    return
+    return true
   end
 
-  if isMage("player") and not Zorlen_isMoving() and  Zorlen_ManaPercent("player") > 70 and ZorlenX_MageConjure() then
+  if isMage("player") and not Zorlen_isMoving() and  Zorlen_ManaPercent("player") > 60 and ZorlenX_MageConjure() then
     ZorlenX_Log("Conjuring water")
-    return
+    return true
   end
 
   --if Zorlen_isMoving() and Zorlen_ManaPercent("player") > 90 then 
   -- throw som hots around.
   --end
   if Zorlen_Drink() then
-    return
+    return true
   end
+  return false
 end
+
+-- Utility Functions
 
 function FollowLeader()
   if isGrouped() and not Zorlen_isCastingOrChanneling()  then
     local leader = LazyPigMultibox_ReturnLeaderUnit()
     FollowUnit(leader)
   end
+end
+
+function isSoftTarget(unit)
+  if isMage(unit) or isWarlock(unit) or isPriest(unit) or isHunter(unit) or isRogue(unit) then
+    return true
+  end
+  if isCasterForm() then
+    return true
+  end
+  return false
+end
+
+function playerIsManaUser()
+  local u = "player"
+  return isCasterForm(u) or isShaman(u) or isWarlock(u) or isPriest(u) or isMage(u) or isPaladin(u) or isHunter(u)
 end
 
 function ZorlenX_isOutside()
@@ -270,6 +288,11 @@ function ZorlenX_UnitIsTank(unit)
   return isWarrior(unit) or isBearForm(unit) or isDireBearForm(unit)
 end
 
+function isRareTarget()
+  local target_type = UnitClassification("target")
+  return (target_type == "elite" or target_type == "rareelite" or target_type == "worldboss")
+end
+
 function ZorlenX_GetTargetCurHP()
   local target_hp = MobHealth_GetTargetCurHP()
   if not target_hp then
@@ -278,10 +301,17 @@ function ZorlenX_GetTargetCurHP()
   return target_hp
 end
 
+function ZorlenX_SmartPetTaunt()
+  if LazyPigMultibox_IsPetSpellKnown(LOCALIZATION_ZORLEN.Torment) and isSoftTarget("targettarget") then
+    zTorment()
+  end
+end
+
 function ZorlenX_PetAttack()
   if Zorlen_isActiveEnemy("target") then
     if not LazyPigMultibox_CheckDelayMode(true) or not UnitExists("pettarget") or UnitIsPartyLeader("player") then
       PetAttack()
+      ZorlenX_SmartPetTaunt()
     end	
   elseif not LazyPigMultibox_UtilizeTarget() then
     PetPassiveMode()
@@ -289,13 +319,19 @@ function ZorlenX_PetAttack()
   end
 end
 
+function isTroll()
+  return Zorlen_isCurrentRaceTroll
+end
+
+function isUndead()
+  return Zorlen_isCurrentRaceUndead
+end
+
 function isDruidInGroup()
   return ZorlenX_classInGroup("DRUID")
 end
 
-function isTroll()
-  return Zorlen_isCurrentRaceTroll
-end
+
 
 function isHunterInGroup()
   return ZorlenX_classInGroup("HUNTER") 
@@ -353,25 +389,82 @@ function ZorlenX_classInGroup(className)
   return false
 end
 
+function playerHaveHealthstone()
+  local healthstoneNames =  {
+    "Minor Healthstone",
+    "Lesser Healthstone",
+    "Healthstone",
+    "Greater Healthstone",
+    "Major Healthstone"
+  }
+  local existingHealthstoneName = false
+  for i, healthstoneName in ipairs(healthstoneNames) do
+    if Zorlen_GiveContainerItemCountByName(healthstoneName) == 1 then
+      existingHealthstoneName = healthstoneName
+    end
+  end
+  return existingHealthstoneName
+end
+
+function useHealthstone()
+  local healthstoneName = playerHaveHealthstone()
+  if healthstoneName and Zorlen_useContainerItemByName(healthstoneName) then
+    return true  
+  end
+end
 
 function playerHaveManaPotion()
-  local manaitems = { 
-    2455,	-- Minor Mana Potion
-    3385,	-- Lesser Mana Potion
-    3827,	-- Mana Potion
-    6149,	-- Greater Mana Potion
-    13443,	-- Superior Mana Potion
+  local potionItemIDs = { 
     13444,	-- Major Mana Potion
+    13443,	-- Superior Mana Potion
+    6149,	-- Greater Mana Potion
+    3827,	-- Mana Potion
+    3385,	-- Lesser Mana Potion
+    2455,	-- Minor Mana Potion
   }
+  for i, potionItemID in ipairs(potionItemIDs) do
+    if Zorlen_GiveContainerItemCountByItemID(potionItemID) > 0 then
+      return potionItemID
+    end
+  end
+  return false
+end
+
+function playerHaveHealthPotion()
+  local potionItemIDs = { 
+    13446,	-- Major Healing Potion
+    3928,	-- Superior Healing Potion
+    1710,	-- Greater Healing Potion
+    929,	-- Healing Potion
+    4596,	-- Discolored Healing Potion
+    858,	-- Lesser Healing Potion
+    118,	-- Minor Healing Potion
+  }
+  for i, potionItemID in ipairs(potionItemIDs) do
+    if Zorlen_GiveContainerItemCountByItemID(potionItemID) > 0 then
+      return potionItemID
+    end
+  end
+  return false
+end
+
+function useHealthPotion()
+  local potionItemID = playerHaveHealthPotion()
+  if not potionItemID then
+    return false
+  end
+  return Zorlen_useContainerItemByItemID(potionItemID)
 end
 
 function useManaPotion()
-  ZorlenX_Log("Would use mana potion. Function need to be implemented.")
-  return false
+  local potionItemID = playerHaveManaPotion()
+  if not potionItemID then
+    return false
+  end
+  return Zorlen_useContainerItemByItemID(potionItemID)
 end
 ----------------- debug utilities -------
 function ZorlenX_Debug(value)
-  DEFAULT_CHAT_FRAME:AddMessage("---")
   DEFAULT_CHAT_FRAME:AddMessage(to_string(value))
 end
 

@@ -351,28 +351,6 @@ function sheepSafe:PeriodicCheckWhileCasting()
   end
 end
 
---can be removed
---function sheepSafe:ScanActionBar()
---  sheepSafe.ccSlot = nil
---  if not self.ccicon then
---    return
---  end
---  sheepSafe:d("rescanning action bar...")
---  local slot
---  for slot=1, 120, 1 do 
---    if (not GetActionText(slot)) then	-- ignore any Player macros :-)
---      local text = GetActionTexture(slot)
---      if (text) then
---        if (string.find(text, self.ccicon))	then 
---          sheepSafe:d("found "..self.cc.." at slot "..slot)
---          self.ccSlot = slot
---          break
---        end
---      end
---    end
---  end
---end
-
 -- Scheduler
 -- We hook the PlayerFrame_OnUpdate function, which gets called	every frame
 -- refrehs (i.e. about 30fps), and restore it when all jobs are	completed.
